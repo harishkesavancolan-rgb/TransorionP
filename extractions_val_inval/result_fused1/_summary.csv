@@ -1,0 +1,61 @@
+file,status,shipment_type,method,ocr_time_sec,time_sec,item_rows,total_tokens,cost_inr,warnings,extraction_status,attempts,validation_errors
+003160840373.INV.STR.HPS.CST.20260811.180620.20260812.011158.229981.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+0715000217.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+1 (2) 7.pdf,ok,import,2d_layout_canvas,0.0,51.63,1,15026,0.2824,1,validated,1,0
+100000176 IN.pdf,ok,export,2d_layout_canvas,0.0,73.18,1,17131,0.3881,0,validated,1,0
+1055044694.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+1085450505.pdf,ok,import,2d_layout_canvas,0.0,79.98,2,18615,0.4132,1,validated,1,0
+11261556 INV.pdf,ok,export,2d_layout_canvas,0.0,86.49,1,18987,0.4412,0,validated,1,0
+1224799144_INV_YHM_TZE_002_20260826_195954.pdf,ok,import,ocrmypdf_docker,4.88,63.77,1,13763,0.2815,0,validated,1,0
+13 Aug Infineon IN International shipment tool - CN16702759 CIPL R 1.pdf,ok,import,2d_layout_canvas,0.0,264.39,18,58400,1.3437,0,validated,2,0
+142 Shipping Documents.PDF,ok,import,ocrmypdf_docker,5.68,153.34,3,36386,0.7179,0,validation_failed,3,6
+1560460274_INV_HKG_HKC_032_20260727_191001.pdf,ok,import,ocrmypdf_docker,5.14,80.84,1,16279,0.3691,0,validated,1,0
+200427000685 INV.pdf,ok,export,2d_layout_canvas,0.0,92.8,1,19551,0.4577,1,validated,1,0
+20260728161255389.pdf,FAILED: Expecting value: line 1 column 1 (char 0),,,0.0,0.0,0,0,0.0,0,,0,0
+20262201728 I.pdf,FAILED: Expecting value: line 1 column 1 (char 0),,,0.0,0.0,0,0,0.0,0,,0,0
+203620644.pdf,ok,export,2d_layout_canvas,0.0,88.6,1,23212,0.4557,0,validated,1,0
+24299.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+2545952 invoice.pdf,ok,import,ocrmypdf_docker,7.24,134.1,18,30548,0.715,1,validated,1,0
+2553936162.pdf,FAILED: Expecting value: line 1 column 1 (char 0),,,0.0,0.0,0,0,0.0,0,,0,0
+2607510.pdf1.pdf,ok,import,2d_layout_canvas,0.0,142.48,9,46892,0.7678,1,validated,1,0
+26U2-03012.pdf,ok,export,ocr_rapidocr,6.81,78.38,1,15360,0.3332,0,validated,1,0
+2710016787 INPL.pdf,ok,export,ocrmypdf_docker,1.78,72.83,1,21206,0.3766,0,validated,1,0
+2710_001.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+3 INV.PDF,ok,import,2d_layout_canvas,0.0,147.58,13,41689,0.8446,0,validated,1,0
+336565030.pdf,ok,export,2d_layout_canvas,0.0,127.06,2,31905,0.6964,0,validated,2,0
+4023_001.pdf,ok,export,ocrmypdf_docker,24.71,128.61,4,29613,0.5423,0,validated,1,0
+455024201.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+4944055413 9160035923-2026241973-INV.PDF,ok,import,2d_layout_canvas,0.0,76.88,1,16997,0.3746,1,validated,1,0
+511927541999-inv 1.pdf,ok,import,2d_layout_canvas,0.0,87.88,3,18914,0.466,0,validated,1,0
+51_20260828114404.pdf,ok,export,ocrmypdf_docker,15.3,80.36,1,17887,0.3386,1,validated,1,0
+602490_20260826T141000 1.pdf,ok,import,ocrmypdf_docker,8.15,76.71,1,21463,0.3824,0,validated,1,0
+6059-FWD INV.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+61X8162957_Commercial Invoice_1.pdf,ok,import,2d_layout_canvas,0.0,64.72,2,14285,0.3142,0,validated,1,0
+670702_2903682022_1.PDF,ok,import,2d_layout_canvas,0.0,102.91,9,25708,0.5351,1,validated,1,0
+6810995125_Commercial Invoice_1.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+7386122192_INV_LEJ_LEJ_CZ4_20260827_184322.pdf,ok,export,ocrmypdf_docker,6.87,189.61,3,43728,0.9164,1,validated,3,0
+AC00600266 INV.pdf,ok,export,2d_layout_canvas,0.0,73.69,1,15445,0.3325,1,validated,1,0
+ACT260102255 INV.pdf,ok,export,2d_layout_canvas,0.0,90.89,1,20788,0.4347,0,validated,1,0
+CI 9010177886.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+Commercial Invoice 11.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+Commercial Invoice_pdf_3.pdf,ok,import,2d_layout_canvas,0.0,110.09,1,22648,0.5354,1,validated,1,0
+CS0306136949.pdf,ok,export,2d_layout_canvas,0.0,108.9,1,25323,0.5189,0,validated,1,0
+DHL Global -Ennoconn Hungary -BY SEA-INV-2926424645.pdf,ok,export,2d_layout_canvas,0.0,203.48,16,34584,0.9212,1,validated,1,0
+EXPORT INV1.pdf,ok,export,2d_layout_canvas,0.0,77.93,1,19405,0.3985,0,validated,1,0
+G12627-2489 Inv (002).pdf,ok,export,2d_layout_canvas,0.0,98.5,1,19123,0.4512,0,validated,1,0
+GBXNAP-992026 INV.pdf,ok,export,2d_layout_canvas,0.0,170.56,9,33153,0.7737,0,validated,2,0
+IN10.pdf,ok,import,2d_layout_canvas,0.0,128.69,1,24755,0.5651,0,validated,2,0
+IN2604006721.pdf,ok,export,ocrmypdf_docker,17.08,257.34,6,88953,1.2547,1,validation_failed,3,1
+Inv & Pack No 30315.pdf,ok,export,2d_layout_canvas,0.0,80.3,1,20547,0.4171,0,validated,1,0
+INV - RGP-005 -V1.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+INV1.pdf,ok,import,2d_layout_canvas,0.0,149.97,7,27775,0.7587,0,validated,1,0
+INV10.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+INV1_1.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+INV1_2.pdf,ok,import,2d_layout_canvas,0.0,61.49,1,14531,0.3186,0,validated,1,0
+Inv34780.PDF,ok,import,2d_layout_canvas,0.0,74.81,1,17245,0.3765,0,validated,1,0
+INV7.pdf,ok,import,2d_layout_canvas,0.0,154.14,4,34680,0.7725,0,validation_failed,3,1
+INVOICE (1).pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+PB1126000200 INPL.pdf,ok,export,2d_layout_canvas,0.0,76.41,1,20170,0.386,1,validated,1,0
+Reroute_CCU50_135177_1704331020_IN66383065 _CI.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+SYT-31036644.pdf,ok,import,2d_layout_canvas,0.0,129.9,1,36099,0.6576,0,validated,3,0
+TN27INV-10031551 INV.pdf,ok,export,2d_layout_canvas,0.0,67.76,1,18469,0.3541,0,validated,1,0

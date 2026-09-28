@@ -1,0 +1,42 @@
+# Core PDF & 2D Spatial Layout Preservation
+pdfplumber>=0.10.0
+pypdf>=5.0.0
+pandas>=2.0.0
+Pillow>=10.0.0
+matplotlib>=3.7.0
+pypdfium2>=4.0.0
+numpy>=1.24.0
+opencv-python>=4.8.0   # scan_validator.py: Hough-transform tilt/clipping detection
+
+# LLM & JSON Parsing
+openai>=1.30.0
+pydantic>=2.5.0
+json_repair>=0.1.0
+python-dotenv>=1.0.0
+tenacity>=8.2.0
+
+# Excel & Template Processing
+openpyxl>=3.1.0
+
+# OCR Fallback for Scanned PDFs
+# onnxruntime is pinned below 1.30.0: that build segfaults on import alone
+# on this Python 3.13 / Windows setup (confirmed -- 1.20.1 works fine).
+# rapidocr_onnxruntime doesn't pin onnxruntime itself, so without this it
+# silently pulls the latest (broken, here) build.
+onnxruntime==1.20.1
+rapidocr_onnxruntime>=1.2.3
+
+# API & Web Server
+# Pinned to match the topstar environment (fastapi 0.111.0 / starlette 0.37.2)
+# rather than the newer fastapi>=0.100.0 default, which pulled in
+# starlette 1.x and was the source of a prior version mismatch.
+fastapi==0.111.0
+starlette==0.37.2
+uvicorn>=0.20.0
+python-multipart>=0.0.9   # required by FastAPI for File()/UploadFile form uploads
+
+# Tests
+pytest>=7.4.0
+
+# Optional: Interactive Jupyter Notebook Environment
+ipykernel>=6.20.0

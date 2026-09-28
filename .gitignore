@@ -1,0 +1,45 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+rocky/
+*.egg-info/
+.pytest_cache/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Local run output
+results/
+*_extracted.json
+test_out*.json
+
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables / secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+
+# Generated files
+output/
+uploads/
+logs/
+
+# OS
+.DS_Store
+Thumbs.db

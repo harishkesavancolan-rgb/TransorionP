@@ -1,0 +1,31 @@
+file,status,shipment_type,method,ocr_time_sec,time_sec,item_rows,total_tokens,cost_inr,warnings
+0715000217.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0
+100000176 IN.pdf,ok,export,2d_layout_canvas,0.0,74.06,1,19348,0.4791,0
+1055044694.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0
+11261556 INV.pdf,ok,export,2d_layout_canvas,0.0,60.54,1,18299,0.407,0
+13 Aug Infineon IN International shipment tool - CN16702759 CIPL R 1.pdf,ok,import,2d_layout_canvas,0.0,79.54,18,30268,0.647,0
+200427000685 INV.pdf,ok,export,2d_layout_canvas,0.0,52.23,1,19658,0.455,1
+20262201728 I.pdf,ok,export,2d_layout_canvas,0.0,95.61,2,42326,0.6809,0
+203620644.pdf,ok,export,2d_layout_canvas,0.0,79.88,1,25505,0.5244,0
+24299.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0
+2545952 invoice.pdf,ok,import,ocrmypdf_docker,7.54,86.37,18,27492,0.6047,2
+26U2-03012.pdf,ok,export,ocr_rapidocr,6.72,50.23,1,14439,0.3082,0
+2710016787 INPL.pdf,ok,export,ocrmypdf_docker,1.84,58.25,1,22232,0.4113,0
+2710_001.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0
+336565030.pdf,ok,export,2d_layout_canvas,0.0,67.96,2,27745,0.6925,0
+4023_001.pdf,ok,export,ocrmypdf_docker,25.68,72.65,4,27105,0.4567,0
+51_20260828114404.pdf,ok,export,ocrmypdf_docker,14.74,66.43,1,18522,0.3597,1
+6059-FWD INV.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0
+AC00600266 INV.pdf,ok,export,2d_layout_canvas,0.0,58.96,1,16869,0.3809,0
+ACT260102255 INV.pdf,ok,export,2d_layout_canvas,0.0,54.12,1,23072,0.506,0
+CI 9010177886.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0
+CS0306136949.pdf,ok,export,2d_layout_canvas,0.0,49.8,1,22978,0.4456,0
+DHL Global -Ennoconn Hungary -BY SEA-INV-2926424645.pdf,ok,export,2d_layout_canvas,0.0,130.07,16,34432,0.9097,1
+EXPORT INV1.pdf,ok,export,2d_layout_canvas,0.0,45.43,1,18444,0.3565,0
+G12627-2489 Inv (002).pdf,ok,export,2d_layout_canvas,0.0,53.39,1,18762,0.4326,0
+GBXNAP-992026 INV.pdf,ok,export,2d_layout_canvas,0.0,54.59,9,23668,0.593,0
+IN2604006721.pdf,ok,export,ocrmypdf_docker,16.12,131.96,6,50758,0.91,1
+Inv & Pack No 30315.pdf,ok,export,2d_layout_canvas,0.0,43.14,1,17734,0.3214,0
+PB1126000200 INPL.pdf,ok,export,2d_layout_canvas,0.0,57.47,1,20215,0.3876,1
+SYT-31036644.pdf,ok,import,2d_layout_canvas,0.0,63.35,2,26072,0.6073,0
+TN27INV-10031551 INV.pdf,ok,export,2d_layout_canvas,0.0,41.92,1,17386,0.3173,0

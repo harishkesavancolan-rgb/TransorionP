@@ -1,0 +1,15 @@
+file,status,shipment_type,method,ocr_time_sec,time_sec,item_rows,total_tokens,cost_inr,warnings,extraction_status,attempts,validation_errors
+PB1126000200 INPL.pdf,ok,export,2d_layout_canvas,0.0,84.07,1,22286,0.4736,0,validated,1,0
+PB1126000208 INPL.pdf,ok,export,2d_layout_canvas,0.0,73.21,1,20656,0.4155,0,validated,1,0
+PB1126000231 INPL.pdf,ok,export,2d_layout_canvas,0.0,77.26,1,21560,0.4499,0,validated,1,0
+PB1126000235 INPL.pdf,ok,export,2d_layout_canvas,0.0,64.66,1,19239,0.365,0,validated,1,0
+PB1126000243 INPL.pdf,ok,export,ocr_rapidocr,12.91,110.84,2,23192,0.5428,0,validated,1,0
+PB1126000251 INPL.pdf,ok,export,2d_layout_canvas,0.0,69.06,1,17932,0.3851,0,validated,1,0
+PB1126000263 INPL.pdf,ok,export,ocr_rapidocr,14.42,104.19,1,22430,0.5079,0,validated,1,0
+PB1126000291 INPL.pdf,ok,export,2d_layout_canvas,0.0,86.02,1,23916,0.5065,0,validated,1,0
+PB1126000292 INPL.pdf,ok,export,2d_layout_canvas,0.0,84.27,1,20141,0.4614,1,validated,1,0
+PB1126000311 INPL.pdf,ok,export,ocr_rapidocr,11.48,103.91,1,21475,0.4842,0,validated,1,0
+PB1126000319 INPL.pdf,ok,export,ocr_rapidocr,12.41,119.4,2,24968,0.5991,0,validated,1,0
+PB1126000325 INPL.pdf,ok,export,2d_layout_canvas,0.0,73.01,1,20948,0.4124,0,validated,1,0
+PB1126000360 INPL.pdf,ok,export,ocr_rapidocr,13.59,96.64,1,21077,0.4646,0,validated,1,0
+PB1126000361 INPL.pdf,ok,export,2d_layout_canvas,0.0,89.97,2,23274,0.4804,0,validated,1,0
