@@ -1,0 +1,19 @@
+file,status,shipment_type,method,ocr_time_sec,time_sec,item_rows,total_tokens,cost_inr,warnings,extraction_status,attempts,validation_errors
+003160840373.INV.STR.HPS.CST.20260811.180620.20260812.011158.229981.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+0715000217.pdf,ok,export,ocr_rapidocr,8.1,308.3,1,18486,0.4105,0,validated,1,0
+1055044694.pdf,ok,export,2d_layout_canvas,0.0,315.7,1,27682,0.527,0,validated,2,0
+20260728161255389.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+20262201728 I.pdf,ok,export,2d_layout_canvas,0.0,484.3,38,386779,8.6558,2,validation_failed,3,34
+24299.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+2553936162.pdf,FAILED: Expecting value: line 1 column 1 (char 0),,,0.0,0.0,0,0,0.0,0,,0,0
+2710_001.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+455024201.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+6059-FWD INV.pdf,ok,export,2d_layout_canvas,0.0,160.5,8,32837,0.6688,0,validated,2,0
+6810995125_Commercial Invoice_1.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+CI 9010177886.pdf,ok,export,2d_layout_canvas,0.0,73.4,1,15903,0.3163,0,validated,1,0
+Commercial Invoice 11.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+INV - RGP-005 -V1.pdf,ok,export,2d_layout_canvas,0.0,111.5,1,23604,0.4759,0,validated,2,0
+INV10.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+INV1_1.pdf,skipped: unknown shipment type -- needs --type override,unknown,,0.0,0.0,0,0,0.0,0,,0,0
+INVOICE (1).pdf,ok,import,ocrmypdf_docker,7.19,83.4,1,21364,0.385,0,validated,1,0
+Reroute_CCU50_135177_1704331020_IN66383065 _CI.pdf,ok,import,2d_layout_canvas,0.0,80.9,1,19167,0.4074,0,validated,1,0

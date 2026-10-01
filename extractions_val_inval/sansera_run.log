@@ -1,0 +1,376 @@
+Validation failed on attempt 1 (1 error(s)) -- re-extracting (items only).
+Validation failed on attempt 1 (2 error(s)) -- re-extracting (items only).
+[info] found 12 PDF(s) -- running 5 concurrently
+[1/12] starting  11261556 INV.pdf
+[info] extracted 5180 chars from D:\prashantproject\FILES\EXPORT\SANSERA MUM SEA EXP 1\SANSERA MUM SEA EXP\11261556 INV.pdf via 2d_layout_canvas
+[info] shipment type set explicitly: export
+[2/12] starting  11261580 IV.pdf
+[info] extracted 5179 chars from D:\prashantproject\FILES\EXPORT\SANSERA MUM SEA EXP 1\SANSERA MUM SEA EXP\11261580 IV.pdf via 2d_layout_canvas
+[info] shipment type set explicitly: export
+[3/12] starting  11261583  INPL.pdf
+[info] extracted 5228 chars from D:\prashantproject\FILES\EXPORT\SANSERA MUM SEA EXP 1\SANSERA MUM SEA EXP\11261583  INPL.pdf via 2d_layout_canvas
+[info] shipment type set explicitly: export
+[4/12] starting  22610399 INPL.pdf
+[info] extracted 8058 chars from D:\prashantproject\FILES\EXPORT\SANSERA MUM SEA EXP 1\SANSERA MUM SEA EXP\22610399 INPL.pdf via ocrmypdf_docker
+[info] OCR completed in 16.07s using ocrmypdf_docker
+[info] shipment type set explicitly: export
+[5/12] starting  22610400 INPL.pdf
+[info] extracted 7388 chars from D:\prashantproject\FILES\EXPORT\SANSERA MUM SEA EXP 1\SANSERA MUM SEA EXP\22610400 INPL.pdf via ocrmypdf_docker
+[info] OCR completed in 13.66s using ocrmypdf_docker
+[info] shipment type set explicitly: export
+[info] validation passed on attempt 1/3
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\result_sansera\valid\22610399 INPL.json
+
+--- HEADER SUMMARY ---
+Invoice No : 22610399  |  Date: 2026-08-12
+Supplier   : SANSERA ENGINEERING LTD
+Buyer      : Tesla, Inc.
+Consignee  : Tesla, Inc.
+Total      : 13041.6 USD
+Terms      : 60 days Net from Date of Inv
+
+--- ITEM (1 items) ---
+  #1  | ASSY, COLLAR, TDA MADE OF STEEL     | Part: 2651200-00-G | Order: 7700021186 (01.05.2026) | Qty: 240 PCS | Rate: 54.34 | Total: 13041.6
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : ocrmypdf_docker
+OCR Execution Time       : 16.07s
+Total Extraction Time    : 86.74s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 6,068
+Cached Input Tokens      : 2,944
+Output Tokens            : 5,902
+Total Tokens             : 14,914
+Cost (USD)               : $0.002679
+Cost (INR)               : INR 0.2277
+[4/12] done      22610399 INPL.pdf  (1 items, 0 warnings, 86.7s)
+[6/12] starting  22610404 INPL.pdf
+[info] extracted 7961 chars from D:\prashantproject\FILES\EXPORT\SANSERA MUM SEA EXP 1\SANSERA MUM SEA EXP\22610404 INPL.pdf via ocrmypdf_docker
+[info] OCR completed in 14.27s using ocrmypdf_docker
+[info] shipment type set explicitly: export
+[info] validation passed on attempt 1/3
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\result_sansera\valid\11261580 IV.json
+
+--- HEADER SUMMARY ---
+Invoice No : 11261580  |  Date: 2026-08-25
+Supplier   : SANSERA ENGINEERING LTD
+Buyer      : Tesla, Inc.
+Consignee  : Tesla, Inc.
+Total      : 12538.37 USD
+Terms      : 90 days net from date of inv
+
+--- ITEM (1 items) ---
+  #1  | AS Y, FORGED HINGE, NE42            | Part: 2285086-02-A | Order:              | Qty: 1728 PCS | Rate: 7.256 | Total: 12538.37
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : 2d_layout_canvas
+Total Extraction Time    : 114.26s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 7,838
+Cached Input Tokens      : 0
+Output Tokens            : 7,117
+Total Tokens             : 14,955
+Cost (USD)               : $0.003239
+Cost (INR)               : INR 0.2753
+[2/12] done      11261580 IV.pdf  (1 items, 0 warnings, 114.3s)
+[7/12] starting  22610405 INPL.pdf
+[info] extracted 7400 chars from D:\prashantproject\FILES\EXPORT\SANSERA MUM SEA EXP 1\SANSERA MUM SEA EXP\22610405 INPL.pdf via ocrmypdf_docker
+[info] OCR completed in 13.35s using ocrmypdf_docker
+[info] shipment type set explicitly: export
+[warn] validation FAILED after 2/3 attempt(s): 1 unresolved error(s)
+[warn]   [HEADER_LINE_TOTAL] Header invoice_total 1270.08 does not match calculated line total 1270080.0 (difference: 1268809.92). This may be a genuine mismatch printed on the source document itself, not necessarily an extraction error -- verify against the document. Not auto-retried: a past retry on this exact rule overwrote an already-correct total with a wrong one to force a match.
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\result_sansera\validation_failed\22610400 INPL.json
+
+--- HEADER SUMMARY ---
+Invoice No : 22610400  |  Date: 2026-08-12
+Supplier   : SANSERA ENGINEERING LTD
+Buyer      : Tesla, Inc.
+Consignee  : Tesla, Inc.
+Total      : 1270.08 USD
+Terms      : 60 days Net from Date of Inv
+
+--- ITEM (1 items) ---
+  #1  | INTERMEDIATE CUP, EDA MADE OF STEEL | Part: 2661212-00-B | Order: 7700021186   | Qty: 288 PCS | Rate: 4410.0 | Total: 1270080.0
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : ocrmypdf_docker
+OCR Execution Time       : 13.66s
+Total Extraction Time    : 107.84s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 3,815
+Cached Input Tokens      : 9,344
+Output Tokens            : 7,576
+Total Tokens             : 20,735
+Cost (USD)               : $0.003268
+Cost (INR)               : INR 0.2778
+[5/12] done      22610400 INPL.pdf  (1 items, 0 warnings, 107.8s)
+[info] validation passed on attempt 1/3
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\result_sansera\valid\11261583  INPL.json
+
+--- HEADER SUMMARY ---
+Invoice No : 11261583  |  Date: 2026-08-25
+Supplier   : SANSERA ENGINEERING LTD
+Buyer      : Tesla, Inc.
+Consignee  : Tesla, Inc.
+Total      : 14385.6 USD
+Terms      : 90 days net from date of inv
+
+--- ITEM (1 items) ---
+  #1  | SLIDING BLOCK, CELL GRID STIFFENER  | Part: 2191407-00-E | Order:              | Qty: 6480 PCS | Rate: 2.22 | Total: 14385.6
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : 2d_layout_canvas
+Total Extraction Time    : 134.32s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 2,470
+Cached Input Tokens      : 5,376
+Output Tokens            : 7,642
+Total Tokens             : 15,488
+Cost (USD)               : $0.003207
+Cost (INR)               : INR 0.2726
+[3/12] done      11261583  INPL.pdf  (1 items, 0 warnings, 134.3s)
+[8/12] starting  22610410 INPL.pdf
+[info] extracted 7387 chars from D:\prashantproject\FILES\EXPORT\SANSERA MUM SEA EXP 1\SANSERA MUM SEA EXP\22610410 INPL.pdf via ocrmypdf_docker
+[info] OCR completed in 13.41s using ocrmypdf_docker
+[info] shipment type set explicitly: export
+[9/12] starting  22610411 INPL.pdf
+[info] extracted 7984 chars from D:\prashantproject\FILES\EXPORT\SANSERA MUM SEA EXP 1\SANSERA MUM SEA EXP\22610411 INPL.pdf via ocrmypdf_docker
+[info] OCR completed in 13.43s using ocrmypdf_docker
+[info] shipment type set explicitly: export
+[info] validation passed on attempt 2/3
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\result_sansera\valid\11261556 INV.json
+
+--- HEADER SUMMARY ---
+Invoice No : 11261556  |  Date: 2026-08-18
+Supplier   : SANSERA ENGINEERING LTD
+Buyer      : Tesla, Inc.
+Consignee  : Tesla, Inc.
+Total      : 16717.82 USD
+Terms      : 90 days net from date of inv
+
+--- ITEM (1 items) ---
+  #1  | AS  FORGED HINGE, NE42              | Part: 2285086-02-A - ASY, FORGED HINGE, NE42 | Order:              | Qty: 2304 PCS | Rate: 7.256 | Total: 16717.82
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : 2d_layout_canvas
+Total Extraction Time    : 182.87s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 5,740
+Cached Input Tokens      : 6,016
+Output Tokens            : 8,754
+Total Tokens             : 20,510
+Cost (USD)               : $0.003819
+Cost (INR)               : INR 0.3246
+[1/12] done      11261556 INV.pdf  (1 items, 0 warnings, 182.9s)
+[10/12] starting  22610416 INPL.pdf
+[info] extracted 9029 chars from D:\prashantproject\FILES\EXPORT\SANSERA MUM SEA EXP 1\SANSERA MUM SEA EXP\22610416 INPL.pdf via ocrmypdf_docker
+[info] OCR completed in 13.33s using ocrmypdf_docker
+[info] shipment type set explicitly: export
+[info] validation passed on attempt 1/3
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\result_sansera\valid\22610404 INPL.json
+
+--- HEADER SUMMARY ---
+Invoice No : 22610404  |  Date: 2026-08-17Validation failed on attempt 1 (2 error(s)) -- re-extracting (items only).
+
+Supplier   : SANSERA ENGINEERING LTD
+Buyer      : Tesla, Inc.
+Consignee  : Tesla, Inc.
+Total      : 29808 USD
+Terms      : 60 days Net from Date of Inv
+
+--- ITEM (1 items) ---
+  #1  | TOW HOOK                            | Part: 2129081-00-E | Order: 7700020171   | Qty: 10800 PCS | Rate: 2.76 | Total: 29808.0
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : ocrmypdf_docker
+OCR Execution Time       : 14.27s
+Total Extraction Time    : 112.54s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 3,598
+Cached Input Tokens      : 5,376
+Output Tokens            : 5,766
+Total Tokens             : 14,740
+Cost (USD)               : $0.002513
+Cost (INR)               : INR 0.2136
+[6/12] done      22610404 INPL.pdf  (1 items, 0 warnings, 112.5s)
+[11/12] starting  22610424 INPL.pdf
+[info] extracted 7594 chars from D:\prashantproject\FILES\EXPORT\SANSERA MUM SEA EXP 1\SANSERA MUM SEA EXP\22610424 INPL.pdf via ocrmypdf_docker
+[info] OCR completed in 13.58s using ocrmypdf_docker
+[info] shipment type set explicitly: export
+[info] validation passed on attempt 1/3
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\result_sansera\valid\22610405 INPL.json
+
+--- HEADER SUMMARY ---
+Invoice No : 22610405  |  Date: 2026-08-17
+Supplier   : SANSERA ENGINEERING LTD
+Buyer      : Tesla, Inc.
+Consignee  : Tesla, Inc.
+Total      : 1776 USD
+Terms      : 60 days Net from Date of Inv
+
+--- ITEM (1 items) ---
+  #1  | INTERMEDIATE CUP,TDA MADE OF STEEL  | Part: 2651212-00-B | Order: N/A          | Qty: 320 PCS | Rate: 5.55 | Total: 1776.0
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : ocrmypdf_docker
+OCR Execution Time       : 13.35s
+Total Extraction Time    : 111.96s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 3,406
+Cached Input Tokens      : 5,376
+Output Tokens            : 6,384
+Total Tokens             : 15,166
+Cost (USD)               : $0.002751
+Cost (INR)               : INR 0.2338
+[7/12] done      22610405 INPL.pdf  (1 items, 0 warnings, 112.0s)
+[12/12] starting  22610436 INPL.pdf
+[info] extracted 9005 chars from D:\prashantproject\FILES\EXPORT\SANSERA MUM SEA EXP 1\SANSERA MUM SEA EXP\22610436 INPL.pdf via ocrmypdf_docker
+[info] OCR completed in 13.66s using ocrmypdf_docker
+[info] shipment type set explicitly: export
+[info] validation passed on attempt 1/3
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\result_sansera\valid\22610411 INPL.json
+
+--- HEADER SUMMARY ---
+Invoice No : 22610411  |  Date: 2026-08-20
+Supplier   : SANSERA ENGINEERING LTD
+Buyer      : Tesla, Inc.
+Consignee  : Tesla, Inc.
+Total      : 13041.6 USD
+Terms      : 60 days Net from Date of Inv
+
+--- ITEM (1 items) ---
+  #1  | ASSY, COLLAR, TDA MADE OF STEEL     | Part: 2651200-00-G- | Order: 22610411 /20.08.2026 | Qty: 240 PCS | Rate: 54.34 | Total: 13041.6
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : ocrmypdf_docker
+OCR Execution Time       : 13.43s
+Total Extraction Time    : 90.99s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 3,580
+Cached Input Tokens      : 5,376
+Output Tokens            : 5,890
+Total Tokens             : 14,846
+Cost (USD)               : $0.002562
+Cost (INR)               : INR 0.2178
+[9/12] done      22610411 INPL.pdf  (1 items, 0 warnings, 91.0s)
+[info] validation passed on attempt 2/3
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\result_sansera\valid\22610410 INPL.json
+
+--- HEADER SUMMARY ---
+Invoice No : 22610410  |  Date: 2026-08-19
+Supplier   : SANSERA ENGINEERING LTD
+Buyer      : Tesla, Inc.
+Consignee  : Tesla, Inc.
+Total      : 5328 USD
+Terms      : 60 days Net from Date of Inv
+
+--- ITEM (1 items) ---
+  #1  | INTERMEDIATE CUP,TDA                | Part: 2651212-00-B | Order: 7700021186 (06.03.2026) | Qty: 960 PCS | Rate: 5.55 | Total: 5328.0
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : ocrmypdf_docker
+OCR Execution Time       : 13.41s
+Total Extraction Time    : 114.59s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 3,896
+Cached Input Tokens      : 9,344
+Output Tokens            : 5,588
+Total Tokens             : 18,828
+Cost (USD)               : $0.002477
+Cost (INR)               : INR 0.2105
+[8/12] done      22610410 INPL.pdf  (1 items, 0 warnings, 114.6s)
+[info] validation passed on attempt 1/3
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\result_sansera\valid\22610424 INPL.json
+
+--- HEADER SUMMARY ---
+Invoice No : 22610424  |  Date: 2026-08-26
+Supplier   : SANSERA ENGINEERING LTD
+Buyer      : Tesla Manufacturing Brandenburg SE
+Consignee  : Tesla Manufacturing Brandenburg SE
+Total      : 41731.2 USD
+Terms      : 60 days Net from Date of Inv
+
+--- ITEM (1 items) ---
+  #1  | TOW HOOK                            | Part: 2129081-00-E | Order:              | Qty: 15120 PCS | Rate: 2.76 | Total: 41731.2
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : ocrmypdf_docker
+OCR Execution Time       : 13.58s
+Total Extraction Time    : 62.21s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 3,654
+Cached Input Tokens      : 5,376
+Output Tokens            : 5,750
+Total Tokens             : 14,780
+Cost (USD)               : $0.002510
+Cost (INR)               : INR 0.2133
+[11/12] done      22610424 INPL.pdf  (1 items, 0 warnings, 62.2s)
+[info] validation passed on attempt 1/3
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\result_sansera\valid\22610416 INPL.json
+
+--- HEADER SUMMARY ---
+Invoice No : 22610416  |  Date: 2026-08-22
+Supplier   : SANSERA ENGINEERING LTD
+Buyer      : Tesla, Inc.
+Consignee  : Tesla, Inc.
+Total      : 30637.44 USD
+Terms      : 60 days Net from Date of Inv
+
+--- ITEM (2 items) ---
+  #1  | HK-RECOVERY HOOK, OFF ROAD LH       | Part: 1250542-00-B | Order: 22610416/ 22.08.2026 | Qty: 864 PCS | Rate: 17.73 | Total: 15318.72
+  #2  | HK-RECOVERY HOOK, OFF ROAD RH       | Part: 1250543-00-B | Order: 22610416/ 22.08.2026 | Qty: 864 PCS | Rate: 17.73 | Total: 15318.72
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : ocrmypdf_docker
+OCR Execution Time       : 13.33s
+Total Extraction Time    : 87.48s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 3,836
+Cached Input Tokens      : 5,376
+Output Tokens            : 6,287
+Total Tokens             : 15,499
+Cost (USD)               : $0.002733
+Cost (INR)               : INR 0.2323
+[10/12] done      22610416 INPL.pdf  (2 items, 0 warnings, 87.5s)
+[info] validation passed on attempt 1/3
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\result_sansera\valid\22610436 INPL.json
+
+--- HEADER SUMMARY ---
+Invoice No : 22610436  |  Date: 2026-08-29
+Supplier   : SANSERA ENGINEERING LTD
+Buyer      : Tesla, Inc.
+Consignee  : Tesla, Inc.
+Total      : 30637.44 USD
+Terms      : 60 days Net from Date of Inv
+
+--- ITEM (2 items) ---
+  #1  | HK-RECOVERY HOOK, OFF ROAD LH       | Part: 1250542-00-B | Order:              | Qty: 864 PCS | Rate: 17.73 | Total: 15318.72
+  #2  | HK-RECOVERY HOOK, OFF ROAD RH       | Part: 1250543-00-B | Order:              | Qty: 864 PCS | Rate: 17.73 | Total: 15318.72
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : ocrmypdf_docker
+OCR Execution Time       : 13.66s
+Total Extraction Time    : 66.59s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 3,822
+Cached Input Tokens      : 5,376
+Output Tokens            : 6,586
+Total Tokens             : 15,784
+Cost (USD)               : $0.002852
+Cost (INR)               : INR 0.2425
+[12/12] done      22610436 INPL.pdf  (2 items, 0 warnings, 66.6s)
+
+[done] 12/12 succeeded, 0 failed, 0 skipped in 295.0s -- total cost Rs.2.94
+[info] wrote summary -> D:\prashantproject\Pray\extractions_val_inval\result_sansera\_summary.csv

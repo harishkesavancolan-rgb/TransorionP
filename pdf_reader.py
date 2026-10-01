@@ -47,6 +47,21 @@ except Exception:
 
 logger = logging.getLogger("invoice_extractor")
 
+
+class ClippedTableError(RuntimeError):
+    """Raised when scan_validator confirms a table border runs off the
+    page edge -- content (a row or column) is physically missing from the
+    scan, not just hard to read. No amount of OCR or layout-canvas work
+    recovers content that was never captured in the first place.
+
+    Callers should catch this distinctly from other extraction failures,
+    the same way AmbiguousShipmentTypeError (detect_type.py) is caught
+    separately from a generic extraction exception -- it means "this scan
+    needs a re-scan or manual review before spending an LLM call on it",
+    not "this file is broken" or "the shipment type is ambiguous".
+    """
+
+
 # Tilt beyond this is treated as "too far off to trust a simple in-plane
 # rotation correction" for a selectable PDF -- warn instead of correcting.
 _MAX_CORRECTABLE_SKEW_DEG = 30.0
@@ -693,6 +708,86 @@ def _get_ocr_engine():
     )
 
 
+def _run_ocr_engine_on_image(image_path: str, engine, engine_type: str, page_idx: int = 0) -> list[str]:
+    """Runs one cached OCR engine on a single page image on disk, returning
+    the extracted lines of text. Factored out of `_ocr()` so the same
+    per-image dispatch logic can also be reused by `_ocr_best_rotation`
+    (see that function) without duplicating the three engines' differing
+    result shapes."""
+    lines_extracted: list[str] = []
+
+    # Option A: RapidOCR (Fastest ONNX, ~1s per page)
+    if engine_type == "rapidocr":
+        with open(image_path, "rb") as f:
+            img_bytes = f.read()
+        result, _ = engine(img_bytes)
+        if result:
+            for line in result:
+                if line and len(line) > 1:
+                    lines_extracted.append(str(line[1]))
+
+    # Option B: Standard PaddleOCR (~2s per page)
+    elif engine_type == "paddleocr":
+        result = None
+        try:
+            result = engine.ocr(image_path)
+        except Exception as pe:
+            logger.warning(
+                "PaddleOCR failed on page %d (%s), falling back to RapidOCR for this page",
+                page_idx + 1, pe,
+            )
+            # Fallback to RapidOCR if Paddle OneDNN crashes on Windows
+            try:
+                from rapidocr_onnxruntime import RapidOCR
+                r_engine = RapidOCR()
+                with open(image_path, "rb") as f:
+                    img_bytes = f.read()
+                r_res, _ = r_engine(img_bytes)
+                if r_res:
+                    for line in r_res:
+                        if line and len(line) > 1:
+                            lines_extracted.append(str(line[1]))
+            except Exception as e2:
+                logger.warning(
+                    "RapidOCR page-level fallback also failed on page %d: %s",
+                    page_idx + 1, e2,
+                )
+
+        if result:
+            for page_res in result:
+                if hasattr(page_res, "text") and page_res.text:
+                    lines_extracted.append(str(page_res.text))
+                elif isinstance(page_res, dict) and "text" in page_res:
+                    lines_extracted.append(str(page_res["text"]))
+                elif isinstance(page_res, (list, tuple)):
+                    for line in page_res:
+                        if isinstance(line, (list, tuple)) and len(line) > 1 and isinstance(line[1], (list, tuple)) and len(line[1]) > 0:
+                            lines_extracted.append(str(line[1][0]))
+                        elif isinstance(line, str):
+                            lines_extracted.append(line)
+                elif hasattr(page_res, "__str__"):
+                    lines_extracted.append(str(page_res))
+
+    # Option C: PaddleOCRVL (Heavy VL pipeline)
+    elif engine_type == "paddleocr_vl":
+        output = engine.predict(image_path)
+        for res in output:
+            if hasattr(res, "markdown") and res.markdown:
+                lines_extracted.append(str(res.markdown))
+            elif hasattr(res, "text") and res.text:
+                lines_extracted.append(str(res.text))
+            elif hasattr(res, "json") and res.json:
+                for item in res.json.get("layout_elements", []):
+                    if "text" in item:
+                        lines_extracted.append(item["text"])
+            elif isinstance(res, dict) and "text" in res:
+                lines_extracted.append(res["text"])
+            else:
+                lines_extracted.append(str(res))
+
+    return lines_extracted
+
+
 def _ocr(pdf_path: str | Path, dpi: int = 200) -> tuple[str, str, str, float]:
     """OCR fallback for scanned / image-only PDFs.
     Uses cached pure-Python PaddleOCR / RapidOCR on pypdfium2-rendered page images.
@@ -719,77 +814,8 @@ def _ocr(pdf_path: str | Path, dpi: int = 200) -> tuple[str, str, str, float]:
             pil_image.save(tmp_img, format="PNG")
             tmp_img_path = tmp_img.name
 
-        lines_extracted: list[str] = []
         try:
-            # Option A: RapidOCR (Fastest ONNX, ~1s per page)
-            if engine_type == "rapidocr":
-                with open(tmp_img_path, "rb") as f:
-                    img_bytes = f.read()
-                result, _ = engine(img_bytes)
-                if result:
-                    for line in result:
-                        if line and len(line) > 1:
-                            lines_extracted.append(str(line[1]))
-
-            # Option B: Standard PaddleOCR (~2s per page)
-            elif engine_type == "paddleocr":
-                result = None
-                try:
-                    result = engine.ocr(tmp_img_path)
-                except Exception as pe:
-                    logger.warning(
-                        "PaddleOCR failed on page %d (%s), falling back to RapidOCR for this page",
-                        page_idx + 1, pe,
-                    )
-                    # Fallback to RapidOCR if Paddle OneDNN crashes on Windows
-                    try:
-                        from rapidocr_onnxruntime import RapidOCR
-                        r_engine = RapidOCR()
-                        with open(tmp_img_path, "rb") as f:
-                            img_bytes = f.read()
-                        r_res, _ = r_engine(img_bytes)
-                        if r_res:
-                            for line in r_res:
-                                if line and len(line) > 1:
-                                    lines_extracted.append(str(line[1]))
-                    except Exception as e2:
-                        logger.warning(
-                            "RapidOCR page-level fallback also failed on page %d: %s",
-                            page_idx + 1, e2,
-                        )
-
-                if result:
-                    for page_res in result:
-                        if hasattr(page_res, "text") and page_res.text:
-                            lines_extracted.append(str(page_res.text))
-                        elif isinstance(page_res, dict) and "text" in page_res:
-                            lines_extracted.append(str(page_res["text"]))
-                        elif isinstance(page_res, (list, tuple)):
-                            for line in page_res:
-                                if isinstance(line, (list, tuple)) and len(line) > 1 and isinstance(line[1], (list, tuple)) and len(line[1]) > 0:
-                                    lines_extracted.append(str(line[1][0]))
-                                elif isinstance(line, str):
-                                    lines_extracted.append(line)
-                        elif hasattr(page_res, "__str__"):
-                            lines_extracted.append(str(page_res))
-
-            # Option C: PaddleOCRVL (Heavy VL pipeline)
-            elif engine_type == "paddleocr_vl":
-                output = engine.predict(tmp_img_path)
-                for res in output:
-                    if hasattr(res, "markdown") and res.markdown:
-                        lines_extracted.append(str(res.markdown))
-                    elif hasattr(res, "text") and res.text:
-                        lines_extracted.append(str(res.text))
-                    elif hasattr(res, "json") and res.json:
-                        for item in res.json.get("layout_elements", []):
-                            if "text" in item:
-                                lines_extracted.append(item["text"])
-                    elif isinstance(res, dict) and "text" in res:
-                        lines_extracted.append(res["text"])
-                    else:
-                        lines_extracted.append(str(res))
-
+            lines_extracted = _run_ocr_engine_on_image(tmp_img_path, engine, engine_type, page_idx)
         finally:
             if os.path.exists(tmp_img_path):
                 try:
@@ -810,6 +836,174 @@ def _ocr(pdf_path: str | Path, dpi: int = 200) -> tuple[str, str, str, float]:
     return full_ocr_text, full_ocr_tables, engine_type, ocr_time_seconds
 
 
+# ── Post-OCR garbled-text recovery (secondary safety net) ───────────────────
+# The PRIMARY fix for a page OSD fails to auto-rotate is _ROTATE_PAGES_THRESHOLD
+# above (a single Docker OCR pass, correct in one shot on every confirmed
+# real case except one). This is a SECOND layer behind that: for a document
+# whose pages don't all share one true orientation -- confirmed on a real
+# 26-page invoice where OSD confidence varied wildly page to page (some
+# pages read confidently at 7-11, others near 0), so no single threshold
+# value rotates every page correctly -- the primary pass still leaves some
+# pages shredded into scrambled single-letter noise ("NIVIO", "IROLY", ...),
+# every word broken into fragments because that page's characters got
+# line-grouped in the wrong reading order. is_scanned_pdf() already has a
+# proven heuristic for exactly this signature measured PRE-ocr (too many
+# single-character "words" relative to real ones -- vertical letter
+# fragmentation from a rotated/corrupted text layer); reapplying the same
+# signature POST-ocr catches whatever the primary pass still missed.
+_GARBLED_MIN_WORDS = 20  # below this, too little text to judge reliably -- don't force a retry on a near-blank page
+_GARBLED_MIN_VALID_WORD_RATIO = 0.5
+
+
+def _word_quality_ratio(text: str) -> tuple[int, float]:
+    """Returns (word_count, fraction of words that are length>=2). Real
+    prose/labels score close to 1.0; OCR output shredded by an uncorrected
+    rotation -- each line's characters read in the wrong order, breaking
+    every word into single-letter fragments -- scores much lower."""
+    words = [w for w in re.split(r"\s+", text) if _WORD_PATTERN.search(w)]
+    if not words:
+        return 0, 0.0
+    valid = sum(1 for w in words if len(w) >= 2)
+    return len(words), valid / len(words)
+
+
+def _looks_garbled(text: str) -> bool:
+    count, ratio = _word_quality_ratio(text)
+    return count >= _GARBLED_MIN_WORDS and ratio < _GARBLED_MIN_VALID_WORD_RATIO
+
+
+def _ocr_page_via_docker(image, dpi: int, rotation: int) -> str:
+    """Rotates a rendered page image, wraps it as a single-page PDF (Pillow
+    can save an image directly as a one-page PDF), and OCRs it through the
+    SAME Docker OCRmyPDF path `_ocr_with_docker()` already uses elsewhere
+    in this file -- so rotation recovery has no dependency beyond what the
+    rest of this module already requires (no local RapidOCR/PaddleOCR/
+    onnxruntime install needed; Docker is the only OCR engine this
+    recovery path uses)."""
+    import tempfile
+
+    candidate_image = image if rotation == 0 else image.rotate(-rotation, expand=True)
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_pdf:
+        tmp_pdf_path = tmp_pdf.name
+    try:
+        candidate_image.convert("RGB").save(tmp_pdf_path, "PDF")
+        docker_pdf, _ = _ocr_with_docker(tmp_pdf_path, dpi=dpi, force_ocr=True, rotate_pages=False)
+        if docker_pdf is None:
+            return ""
+        try:
+            return extract_full_pdf(docker_pdf)
+        finally:
+            if os.path.exists(docker_pdf):
+                try:
+                    os.unlink(docker_pdf)
+                except Exception:
+                    pass
+    finally:
+        if os.path.exists(tmp_pdf_path):
+            try:
+                os.unlink(tmp_pdf_path)
+            except Exception:
+                pass
+
+
+def _ocr_best_rotation(pdf_path: str | Path, dpi: int = 200) -> tuple[str, float, float]:
+    """Re-OCRs `pdf_path` at whichever of 0/90/180/270 degrees scores best
+    on `_word_quality_ratio`, via Docker OCRmyPDF (see `_ocr_page_via_docker`)
+    -- the same OCR engine `extract_text()` already relies on, so this
+    recovery path needs nothing beyond what's already required elsewhere in
+    this module. Only meant to be called as a SECOND-line recovery step once
+    the PRIMARY fix (_ROTATE_PAGES_THRESHOLD, a single normal Docker OCR
+    pass) has already run and still produced text that `_looks_garbled()`
+    -- this is strictly more expensive than that primary pass, so it must
+    never run unconditionally.
+
+    Deliberately determines the rotation ONCE from page 1, not per page, and
+    applies it uniformly to every other page -- bypassing Tesseract's own
+    per-page OSD confidence entirely in favor of this module's own
+    `_word_quality_ratio` scoring. Confirmed on a real 26-page invoice where
+    the primary pass's OSD confidence varied wildly page to page (several
+    pages scored near 0, "confidence too low to rotate", among others
+    scoring 7-11): the document was in fact uniformly rotated, and those
+    low scores reflected sparse/table-heavy page content OSD struggled to
+    read confidently, not a genuinely different physical orientation --
+    applying page 1's winning rotation to every page recovered the whole
+    document correctly. A document with ACTUAL mixed per-page rotations
+    (each page truly scanned differently) still isn't handled by this
+    function; none of the confirmed real failures have been that case.
+
+    Returns (recovered_text, quality_ratio, elapsed_seconds) so the caller
+    can compare against what it already has and only adopt this result if
+    it's better.
+    """
+    import time
+
+    start_ocr = time.perf_counter()
+    scale = dpi / 72
+
+    doc = pdfium.PdfDocument(str(pdf_path))
+    num_pages = len(doc)
+    if num_pages == 0:
+        doc.close()
+        return "", 0.0, round(time.perf_counter() - start_ocr, 2)
+
+    first_page_image = doc[0].render(scale=scale).to_pil()
+
+    best_rotation = 0
+    best_text = ""
+    best_ratio = -1.0
+    for rotation in (0, 90, 180, 270):
+        candidate_text = _ocr_page_via_docker(first_page_image, dpi, rotation)
+        _, ratio = _word_quality_ratio(candidate_text)
+        # Ties keep the FIRST (0-degree) candidate rather than an equally-
+        # scoring later rotation -- with no evidence a rotation helped,
+        # there's no reason to prefer one over the page's own unrotated
+        # orientation.
+        if ratio > best_ratio:
+            best_ratio = ratio
+            best_rotation = rotation
+            best_text = candidate_text
+
+    ocr_pages = [best_text] if best_text else []
+    for page_idx in range(1, num_pages):
+        page_image = doc[page_idx].render(scale=scale).to_pil()
+        page_text = _ocr_page_via_docker(page_image, dpi, best_rotation)
+        if page_text:
+            ocr_pages.append(page_text)
+
+    doc.close()
+    elapsed = round(time.perf_counter() - start_ocr, 2)
+    logger.info(
+        "%s: rotation-recovery OCR finished in %.2fs (chosen rotation: %d degrees)",
+        pdf_path, elapsed, best_rotation,
+    )
+    full_text = "\n\n".join(ocr_pages).strip()
+    _, overall_ratio = _word_quality_ratio(full_text)
+    return full_text, overall_ratio, elapsed
+
+
+def _maybe_recover_garbled_ocr(
+    pdf_path: str | Path, text: str, method: str, ocr_time: float,
+) -> tuple[str, str, float]:
+    """Called after the PRIMARY rotation fix (_ROTATE_PAGES_THRESHOLD) has
+    already run as part of producing `text`. If `text` still looks garbled
+    (see `_looks_garbled`) -- the primary fix wasn't enough, e.g. the mixed-
+    OSD-confidence case _ocr_best_rotation's docstring describes -- retries
+    with `_ocr_best_rotation` and adopts the recovered text only if it
+    actually scores better, so a document that's genuinely just hard to OCR
+    (not a rotation problem) still gets its best-effort original text back
+    rather than being silently replaced by an equally-poor retry. Returns
+    (text, method, ocr_time), unchanged if no recovery was needed or it
+    didn't help."""
+    if not _looks_garbled(text):
+        return text, method, ocr_time
+    logger.info("%s: OCR output looks garbled, retrying with per-page rotation search", pdf_path)
+    recovered_text, recovered_ratio, recovery_time = _ocr_best_rotation(pdf_path)
+    _, current_ratio = _word_quality_ratio(text)
+    if recovered_text and recovered_ratio > current_ratio:
+        return recovered_text, f"{method}+rotation_recovered", round(ocr_time + recovery_time, 2)
+    return text, method, round(ocr_time + recovery_time, 2)
+
+
 # A normalize_pdf_rotation() helper used to run here before extract_full_pdf(),
 # meant to "fix" a page with /Rotate != 0 by calling pypdf's page.rotate().
 # Removed: pypdf's rotate() only overwrites the /Rotate dictionary entry --
@@ -824,8 +1018,27 @@ def _ocr(pdf_path: str | Path, dpi: int = 200) -> tuple[str, str, str, float]:
 # step at all -- pdfplumber needs no help here.
 
 
+_ROTATE_PAGES_THRESHOLD = 5
+# OCRmyPDF's own default is 14.0 -- confirmed too strict on real scans:
+# Tesseract's OSD correctly identified the rotation on genuinely-rotated
+# pages with confidence 7.99 and 13.92 (both real, correct reads), but the
+# default threshold silently rejected applying either correction, leaving
+# --rotate-pages a no-op and the page's text shredded into scrambled
+# single-letter fragments once OCR ran on it unrotated. Lowering the bar to
+# 5 recovered those pages in a single Docker OCR pass -- no need for the
+# separate per-page rotation-search fallback (_ocr_best_rotation) this file
+# also has, which exists for whatever a threshold this low still can't
+# resolve (e.g. a document with genuinely mixed per-page orientations).
+# Confirmed NOT to cause false-positive rotations on already-correctly-
+# oriented pages: OSD reports "rotation appears correct" for an upright
+# page regardless of its confidence score -- the threshold only ever gates
+# whether a DETECTED-different orientation gets applied, so it has no
+# effect on a page OSD already agrees needs no rotation.
+
+
 def _ocr_with_docker(
-    input_path: str | Path, dpi: int = 300, force_ocr: bool = False
+    input_path: str | Path, dpi: int = 300, force_ocr: bool = False, rotate_pages: bool = True,
+    rotate_pages_threshold: float = _ROTATE_PAGES_THRESHOLD,
 ) -> tuple[Path | None, float]:
     """
     Uses the official OCRmyPDF Docker container (jbarlow83/ocrmypdf-alpine)
@@ -839,6 +1052,15 @@ def _ocr_with_docker(
     content unrecovered. `force_ocr=True` passes --force-ocr instead,
     which rasterizes and re-OCRs every page unconditionally -- slower, but
     is the fix when --skip-text is the reason a scan came back empty.
+
+    `rotate_pages=False` omits --rotate-pages entirely. Needed by
+    `_ocr_page_via_docker` (the rotation-recovery fallback in
+    `_ocr_best_rotation`): that caller has already manually rotated the
+    page image to the orientation it wants tested, specifically because
+    Tesseract's own OSD-based --rotate-pages failed to get it right in the
+    first place -- leaving --rotate-pages on would let that same unreliable
+    auto-detection re-guess on top of the caller's manual rotation and
+    potentially rotate it right back to wrong.
 
     Returns (Path_to_pdf_or_None, ocr_time_seconds).
     """
@@ -864,7 +1086,7 @@ def _ocr_with_docker(
         "docker", "run", "--rm", "-i",
         "jbarlow83/ocrmypdf-alpine",
         "--image-dpi", str(dpi),
-        "--rotate-pages",  # corrects gross 90-degree-multiple orientation
+        *(["--rotate-pages", "--rotate-pages-threshold", str(rotate_pages_threshold)] if rotate_pages else []),
         "--deskew",        # corrects fine-grained tilt (Leptonica-based)
         "--force-ocr" if force_ocr else "--skip-text",
         "-", "-"
@@ -935,6 +1157,32 @@ def visualize_document_layout(pdf_path: str | Path, page_num: int = 0, dpi: int 
         plt.show()
 
 
+def check_scan_quality(pdf_path: str | Path) -> dict | None:
+    """Runs scan_validator.validate_pdf() on page 0 alone -- cheap (a single
+    page render + Hough-line analysis), unlike extract_text() itself, which
+    may run a full OCR pass costing tens of seconds to several minutes on a
+    large scanned document.
+
+    Factored out of extract_text() so a caller can check for a confirmed-
+    clipped table BEFORE paying for OCR at all, not just before the LLM
+    call after OCR already ran -- confirmed real case: gating only after
+    extract_text() still spent 443s OCR'ing a 26-page document whose page 0
+    was already known clipped from this cheap check alone. Returns None if
+    scan_validator isn't available or the check itself fails -- callers
+    should treat that as "couldn't determine", not "confirmed fine".
+    """
+    if scan_validator is None:
+        return None
+    try:
+        scan_quality = scan_validator.validate_pdf(str(pdf_path), page=0)
+        if not scan_quality["valid"]:
+            logger.warning("%s: scan quality check failed: %s", pdf_path, scan_quality["reasons"])
+        return scan_quality
+    except Exception as e:
+        logger.debug("%s: scan quality check could not run (%s)", pdf_path, e)
+        return None
+
+
 def extract_text(
     pdf_path: str | Path,
     min_chars_for_text_layer: int = 40,
@@ -966,14 +1214,7 @@ def extract_text(
         * False -- always try the digital text layer first, and if OCR is
           needed, always use --skip-text (never auto-upgrade to --force-ocr).
     """
-    scan_quality: dict | None = None
-    if scan_validator is not None:
-        try:
-            scan_quality = scan_validator.validate_pdf(str(pdf_path), page=0)
-            if not scan_quality["valid"]:
-                logger.warning("%s: scan quality check failed: %s", pdf_path, scan_quality["reasons"])
-        except Exception as e:
-            logger.debug("%s: scan quality check could not run (%s)", pdf_path, e)
+    scan_quality = check_scan_quality(pdf_path)
 
     skip_digital_path = force_ocr is True
 
@@ -1017,7 +1258,10 @@ def extract_text(
         try:
             d_text = extract_full_pdf(docker_pdf)
             if len(d_text) >= min_chars_for_text_layer:
-                return d_text, "", "ocrmypdf_docker", docker_time, scan_quality
+                d_text, method, docker_time = _maybe_recover_garbled_ocr(
+                    pdf_path, d_text, "ocrmypdf_docker", docker_time,
+                )
+                return d_text, "", method, docker_time, scan_quality
         finally:
             if os.path.exists(docker_pdf):
                 try:
@@ -1027,7 +1271,10 @@ def extract_text(
 
     # 4. Fallback to Python OCR (RapidOCR / PaddleOCR / PaddleOCR-VL)
     ocr_text, ocr_tables, engine_type, ocr_time = _ocr(pdf_path)
-    return ocr_text, ocr_tables, f"ocr_{engine_type}", ocr_time, scan_quality
+    ocr_text, method, ocr_time = _maybe_recover_garbled_ocr(
+        pdf_path, ocr_text, f"ocr_{engine_type}", ocr_time,
+    )
+    return ocr_text, ocr_tables, method, ocr_time, scan_quality
 
 
 if __name__ == "__main__":

@@ -107,7 +107,7 @@ async def extract_and_validate(
                 total_usage[k] += i_usage.get(k, 0)
 
         if need_header or need_items:
-            apply_header_guardrails(header_raw, items_raw, invoice_text)
+            apply_header_guardrails(header_raw, items_raw, invoice_text, shipment_type=shipment_type)
 
         raw = {"invoice_header": header_raw, "line_items": items_raw}
         sheets, warnings, header = validate_and_coerce(raw, schema, shipment_type)

@@ -18,6 +18,7 @@ from invoice_validator import (
     validate_format_and_types,
     build_retry_feedback,
     _parse_header_total,
+    RETRYABLE_RULES,
 )
 
 
@@ -118,21 +119,28 @@ def test_correct_header_total_passes():
     assert c.status == "PASS"
 
 
-def test_incorrect_header_total_warns_with_clear_message_not_retryable():
-    # WARNING, not ERROR/retryable: confirmed real case (Piramal export
+def test_incorrect_header_total_fails_but_is_not_retryable():
+    # ERROR (fails validation -- a human needs to look at it), but
+    # deliberately NOT retryable: confirmed real case (Piramal export
     # invoice) where the header total genuinely did NOT match the sum of
     # its own line items because the SOURCE DOCUMENT's own printed total
     # only covered the first item -- a real document quirk, not an
-    # extraction mistake. Forcing this ERROR+retryable would let a retry
-    # "fix" an already-correct 51166.08 into the wrong 78382.08 just to
-    # match the sum, which is exactly what happened before this was
-    # downgraded to WARNING.
+    # extraction mistake. Forcing this retryable would let a retry "fix"
+    # an already-correct 51166.08 into the wrong 78382.08 just to match
+    # the sum, which is exactly what happened when this was retryable
+    # before. A plain WARNING (tried next) swung too far the other way --
+    # it let a confirmed hallucinated total (not derived from a sum
+    # mismatch at all, see test_invoice_validator.py's
+    # MULTI_INVOICE_TOTAL_SPLIT tests) reach "valid" output with no
+    # signal. ERROR + not-in-RETRYABLE_RULES is the combination that
+    # surfaces every mismatch for review without ever auto-"fixing" one.
     header = {"invoice_total": 51166.08}
     items = [{"ItmTaxableVal": 51166.08}, {"ItmTaxableVal": 27216.00}]
     checks = validate_totals(header, items, "export")
     c = _find(checks, "HEADER_LINE_TOTAL")
-    assert c.status == "WARNING"
+    assert c.status == "ERROR"
     assert c.retryable is False
+    assert "HEADER_LINE_TOTAL" not in RETRYABLE_RULES
     assert c.expected == Decimal("78382.08")
     assert c.actual == Decimal("51166.08")
     assert c.difference == Decimal("27216.00")
@@ -231,6 +239,19 @@ def test_all_required_fields_present_passes():
     items = [{"Item_Ser_No": 1, "Item_Desc": "X", "Item_Qty": 5, "Item_Unit1": "PCS", "Item_Unit_Price": 5}]
     checks = validate_required_fields(items, "export")
     assert all(c.status == "PASS" for c in checks if c.item == 1)
+
+
+def test_missing_unit_is_not_flagged_or_retried():
+    # Confirmed real case: a 10-page export invoice had no unit-of-measure
+    # column printed anywhere in the document -- quantity/unit_price/line
+    # amount were all extracted correctly, but "unit" genuinely doesn't
+    # exist on the source. Unlike quantity/unit_price/description/ser_no,
+    # a missing unit must never produce a REQUIRED_FIELD_MISSING check at
+    # all (no ERROR, no PASS) -- retrying it would burn attempts that can
+    # never succeed.
+    items = [{"Item_Ser_No": 1, "Item_Desc": "X", "Item_Qty": 5, "Item_Unit1": "", "Item_Unit_Price": 5}]
+    checks = validate_required_fields(items, "export")
+    assert not any(c.field == "Item_Unit1" for c in checks)
 
 
 # ── 8 & 9: Part number vs source text ───────────────────────────────────
@@ -347,9 +368,9 @@ def test_package_counts_not_checked_when_no_item_has_one():
     assert c.status == "NOT_CHECKED"
 
 
-# ── Full-invoice orchestration: header-total WARNING, not invalid ───────
+# ── Full-invoice orchestration: header-total fails, but never auto-retries ──
 
-def test_validate_invoice_flags_header_total_mismatch_as_warning_not_invalid_end_to_end():
+def test_validate_invoice_flags_header_total_mismatch_as_invalid_but_not_retryable_end_to_end():
     result = _export_result()
     result["sheets"]["ITEM"].append({
         **result["sheets"]["ITEM"][0],
@@ -360,12 +381,14 @@ def test_validate_invoice_flags_header_total_mismatch_as_warning_not_invalid_end
         "Qty Tariff": 100,  # keep QTY_VS_TARIFF_QTY consistent with the new Item_Qty
     })
     # header.invoice_total (51166.08) now understates the true sum (78382.08)
-    # -- a WARNING, not an ERROR, so it must not flip the whole document invalid.
+    # -- ERROR, so the document must fail validation (not silently "valid"),
+    # but must never show up as a retryable error (no auto re-extraction).
     validation = validate_invoice(result, invoice_text="", shipment_type="export")
-    assert validation.valid is True
+    assert validation.valid is False
     c = _find(validation.checks, "HEADER_LINE_TOTAL")
-    assert c.status == "WARNING"
+    assert c.status == "ERROR"
     assert c.difference == Decimal("27216.00")
+    assert c not in validation.retryable_errors
 
 
 def test_not_checked_returned_when_inputs_missing_not_error():
@@ -374,6 +397,83 @@ def test_not_checked_returned_when_inputs_missing_not_error():
     checks = validate_totals(header, items, "export")
     c = _find(checks, "HEADER_LINE_TOTAL")
     assert c.status == "NOT_CHECKED"
+
+
+# ── MULTI_INVOICE_TOTAL_SPLIT: combined-document total must mirror ──────
+# invoice_number's own split, never be a single computed/summed figure.
+
+def test_single_invoice_total_not_split_when_combined_document_hallucinates_sum():
+    # Confirmed real case: invoice_number correctly split into two
+    # sub-invoices, but invoice_total came back as "5888" -- the SUM of
+    # the two sub-invoices' real totals (4416.00 + 1472.00), not a value
+    # printed anywhere on the document. No line-item amounts were
+    # extracted at all, so HEADER_LINE_TOTAL alone (NOT_CHECKED when there's
+    # nothing to sum) would have let this through completely unflagged.
+    header = {"invoice_number": "944624267 / 944624264", "invoice_total": "5888"}
+    items = [{"ItmTaxableVal": None}, {"ItmTaxableVal": None}]
+    checks = validate_totals(header, items, "export")
+    c = _find(checks, "MULTI_INVOICE_TOTAL_SPLIT")
+    assert c.status == "ERROR"
+    assert c.expected == "2 '/'-separated total(s), one per sub-invoice"
+    assert c.actual == "5888"
+
+
+def test_correctly_split_multi_invoice_total_passes():
+    header = {"invoice_number": "IN2604006721 / IN2604006722", "invoice_total": "10721.49 / 29812.90"}
+    items = [{"ItmTaxableVal": None}]
+    checks = validate_totals(header, items, "export")
+    assert _find(checks, "MULTI_INVOICE_TOTAL_SPLIT") is None
+
+
+def test_single_invoice_number_with_single_total_is_unaffected():
+    header = {"invoice_number": "944624267", "invoice_total": 5888}
+    items = [{"ItmTaxableVal": None}]
+    checks = validate_totals(header, items, "export")
+    assert _find(checks, "MULTI_INVOICE_TOTAL_SPLIT") is None
+
+
+def test_slashes_inside_a_single_invoice_number_are_not_a_combined_document():
+    # Real invoice numbers from this project's own outputs -- a bare "/"
+    # is part of the number itself, not a sub-invoice separator.
+    for number in ("KA/2627/I/033552", "EXPU2/2627/0612"):
+        header = {"invoice_number": number, "invoice_total": 4416.0}
+        checks = validate_totals(header, [{"ItmTaxableVal": None}], "export")
+        assert _find(checks, "MULTI_INVOICE_TOTAL_SPLIT") is None, number
+
+
+def test_combined_document_of_slashed_invoice_numbers_counts_sub_invoices_correctly():
+    # Two sub-invoices, each with slashes inside its own number: that's 2
+    # parts, not 8.
+    header = {
+        "invoice_number": "KA/2627/I/000431 / KA/2627/I/000433",
+        "invoice_total": "4416.00 / 1472.00",
+    }
+    checks = validate_totals(header, [{"ItmTaxableVal": None}], "export")
+    assert _find(checks, "MULTI_INVOICE_TOTAL_SPLIT") is None
+    assert _parse_header_total(header) == Decimal("5888.00")
+
+
+def test_combined_document_of_slashed_invoice_numbers_still_flags_single_total():
+    header = {"invoice_number": "KA/2627/I/000431 / KA/2627/I/000433", "invoice_total": "5888"}
+    checks = validate_totals(header, [{"ItmTaxableVal": None}], "export")
+    assert _find(checks, "MULTI_INVOICE_TOTAL_SPLIT").status == "ERROR"
+
+
+def test_slashed_single_invoice_with_slashed_total_is_not_summed():
+    header = {"invoice_number": "KA/2627/I/033552", "invoice_total": "100/200"}
+    assert _parse_header_total(header) is None
+
+
+def test_multi_invoice_total_split_mismatch_fails_validation_end_to_end():
+    result = _export_result(header_overrides={
+        "invoice_number": "944624267 / 944624264", "invoice_total": "5888",
+    })
+    result["sheets"]["ITEM"][0]["ItmTaxableVal"] = None
+    validation = validate_invoice(result, invoice_text="", shipment_type="export")
+    assert validation.valid is False
+    c = _find(validation.checks, "MULTI_INVOICE_TOTAL_SPLIT")
+    assert c.status == "ERROR"
+    assert c in validation.retryable_errors
 
 
 # ── Retry-feedback construction ─────────────────────────────────────────

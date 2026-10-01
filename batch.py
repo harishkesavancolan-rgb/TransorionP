@@ -27,6 +27,7 @@ from pathlib import Path
 
 from main import run
 from detect_type import AmbiguousShipmentTypeError
+from pdf_reader import ClippedTableError
 from reextraction import MAX_REEXTRACTION_ATTEMPTS
 
 _EMPTY_ROW_FIELDS = {
@@ -36,8 +37,34 @@ _EMPTY_ROW_FIELDS = {
 }
 
 
+def _output_names(pdfs: list[Path], root: Path) -> dict[Path, str]:
+    """
+    Output JSON name (without extension) per PDF. Normally just the PDF's
+    own stem -- but rglob() collects files from every subfolder, and the
+    same filename routinely appears in more than one (e.g. "INPL.pdf" under
+    two different clients, or a client folder nested inside a duplicate of
+    itself), which used to make one result silently overwrite the other.
+    Any stem shared by more than one PDF (case-insensitively, since Windows
+    paths are) gets its folder path relative to `root` prefixed instead,
+    joined with "__".
+    """
+    counts: dict[str, int] = {}
+    for pdf in pdfs:
+        counts[pdf.stem.lower()] = counts.get(pdf.stem.lower(), 0) + 1
+
+    names: dict[Path, str] = {}
+    for pdf in pdfs:
+        if counts[pdf.stem.lower()] == 1:
+            names[pdf] = pdf.stem
+        else:
+            names[pdf] = "__".join(pdf.relative_to(root).with_suffix("").parts)
+    return names
+
+
 async def _process_one(
     pdf: Path,
+    out_name: str,
+    display_name: str,
     model: str,
     out_dir: Path,
     shipment_type: str,
@@ -46,16 +73,17 @@ async def _process_one(
     semaphore: asyncio.Semaphore,
     idx: int,
     total: int,
+    allow_clipped: bool = False,
 ) -> dict:
     """Process a single PDF, bounded by the semaphore for concurrency control."""
     async with semaphore:
-        out_path = out_dir / f"{pdf.stem}.json"
+        out_path = out_dir / f"{out_name}.json"
         print(f"[{idx}/{total}] starting  {pdf.name}")
         t0 = time.perf_counter()
         try:
             result = await run(
                 str(pdf), model, str(out_path), shipment_type=shipment_type,
-                force_ocr=force_ocr, max_retries=max_retries,
+                force_ocr=force_ocr, max_retries=max_retries, allow_clipped=allow_clipped,
             )
             elapsed = round(time.perf_counter() - t0, 1)
             token_info = result.get("token_usage", {})
@@ -64,7 +92,7 @@ async def _process_one(
             print(f"[{idx}/{total}] done      {pdf.name}  "
                   f"({n_items} items, {n_warn} warnings, {elapsed}s)")
             return {
-                "file": pdf.name,
+                "file": display_name,
                 "status": "ok",
                 "shipment_type": result.get("shipment_type", ""),
                 "method": result.get("extraction_method", ""),
@@ -81,15 +109,23 @@ async def _process_one(
         except AmbiguousShipmentTypeError as e:
             print(f"[{idx}/{total}] skipped   {pdf.name}: ambiguous type -- re-run with --type export|import")
             return {
-                "file": pdf.name,
+                "file": display_name,
                 "status": "skipped: unknown shipment type -- needs --type override",
                 "shipment_type": "unknown",
+                **_EMPTY_ROW_FIELDS,
+            }
+        except ClippedTableError as e:
+            print(f"[{idx}/{total}] skipped   {pdf.name}: table clipped -- {e}")
+            return {
+                "file": display_name,
+                "status": "skipped: table clipped -- needs manual review, or re-run with --allow-clipped",
+                "shipment_type": "",
                 **_EMPTY_ROW_FIELDS,
             }
         except Exception as e:
             print(f"[{idx}/{total}] FAILED    {pdf.name}: {e}")
             return {
-                "file": pdf.name,
+                "file": display_name,
                 "status": f"FAILED: {e}",
                 "shipment_type": "",
                 **_EMPTY_ROW_FIELDS,
@@ -104,19 +140,30 @@ async def run_batch(
     force_ocr: bool | None = None,
     max_retries: int = MAX_REEXTRACTION_ATTEMPTS,
     workers: int = 5,
+    allow_clipped: bool = False,
 ):
     out_dir = Path(out_dir_path)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    pdfs = sorted(Path(folder).rglob("*.pdf"))
+    root = Path(folder)
+    pdfs = sorted(root.rglob("*.pdf"))
     total = len(pdfs)
     print(f"[info] found {total} PDF(s) -- running {workers} concurrently")
+
+    out_names = _output_names(pdfs, root)
+    n_renamed = sum(1 for pdf in pdfs if out_names[pdf] != pdf.stem)
+    if n_renamed:
+        print(f"[info] {n_renamed} PDF(s) share a filename with another PDF in a different "
+              f"folder -- their output JSON is prefixed with the folder path")
 
     semaphore = asyncio.Semaphore(workers)
     t_start = time.perf_counter()
 
     tasks = [
-        _process_one(pdf, model, out_dir, shipment_type, force_ocr, max_retries, semaphore, i + 1, total)
+        _process_one(
+            pdf, out_names[pdf], pdf.relative_to(root).as_posix(), model, out_dir,
+            shipment_type, force_ocr, max_retries, semaphore, i + 1, total, allow_clipped,
+        )
         for i, pdf in enumerate(pdfs)
     ]
     summary_rows = await asyncio.gather(*tasks)
@@ -136,7 +183,11 @@ async def run_batch(
         "time_sec", "item_rows", "total_tokens", "cost_inr", "warnings",
         "extraction_status", "attempts", "validation_errors",
     ]
-    with open(summary_path, "w", newline="") as f:
+    # Explicit UTF-8 (with BOM, so Excel detects it): the platform default
+    # on Windows is cp1252, which can't encode filenames like
+    # "Mix (18)🏳️.pdf" -- that crashed here AFTER every file had already
+    # been processed, losing the whole summary.
+    with open(summary_path, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(summary_rows)
@@ -171,11 +222,17 @@ def main():
                     help=f"Re-extraction attempts allowed per file after a validation failure "
                          f"(default: {MAX_REEXTRACTION_ATTEMPTS}, i.e. {MAX_REEXTRACTION_ATTEMPTS + 1} "
                          f"attempts total). Set to 0 to disable retries.")
+    ap.add_argument("--allow-clipped", action="store_true",
+                    help="Apply to every file: extract anyway even if a scan's table border "
+                         "touches the page edge (a row/column is likely physically missing). "
+                         "Without this flag, a file with a confirmed-clipped scan is skipped "
+                         "(see the summary CSV) rather than spending an LLM call on it.")
     args = ap.parse_args()
 
     asyncio.run(run_batch(
         args.folder, args.model, args.out_dir, shipment_type=args.type,
         force_ocr=args.force_ocr, max_retries=args.max_retries, workers=args.workers,
+        allow_clipped=args.allow_clipped,
     ))
 
 

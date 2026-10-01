@@ -158,7 +158,20 @@ _COUNTRY_NAME_PREFIX_RE = re.compile(
 # keyword hits -- e.g. "Receiver: ABB India Limited ... INDIA" on a
 # waybill, or "Customer ... ABB INDIA LIMITED" on a commercial invoice.
 _BUYER_LABELS = ("customer", "buyer", "consignee", "bill to", "ship to",
-                 "sold to", "invoice address", "importer", "receiver")
+                 "sold to", "invoice address", "invoice to", "invoices address",
+                 "delivery address", "importer", "receiver")
+# "invoice to" added after a confirmed real invoice (Aptiv Components India
+# Private Ltd.) used that exact label -- distinct from the already-covered
+# "invoice address" -- with the buyer's India address sitting immediately
+# after it.
+# "invoices address" (plural) added after a confirmed real invoice used
+# that exact spelling for its buyer-side label; the existing singular
+# "invoice address" entry doesn't match it since labels are matched as
+# fixed word sequences, not a stemmed/pluralized pattern.
+# "delivery address" added after the same confirmed real invoice used it
+# alongside "invoices address" as its only two buyer-side labels (no
+# "bill to"/"ship to"/"customer" anywhere on the document), both pointing
+# at the same India buyer.
 _SUPPLIER_LABELS = ("supplier", "seller", "exporter", "shipper", "sold by",
                     "vendor", "manufacturer", "ship from")
 # "ship from" added after a confirmed real invoice had it as the ONLY
@@ -167,13 +180,24 @@ _SUPPLIER_LABELS = ("supplier", "seller", "exporter", "shipper", "sold by",
 # entity instead, so the supplier-side proximity check found no India
 # there and missed the signal entirely; "ship from" is the natural,
 # already-covered counterpart to "ship to" (in _BUYER_LABELS below).
-_LABEL_PROXIMITY_WINDOW = 400  # chars scanned after the label for "India"
+_LABEL_PROXIMITY_WINDOW = 900  # chars scanned after the label for "India"
 # Was 200: a real invoice ("SOLD-TO" -> "...Agilent Technologies India...")
 # had "india" starting at character 198 after the label -- so close that
 # only 2 of its 5 characters fell inside a 200-char window and the whole
 # match silently missed. VAT ID numbers, tax codes, and multi-line
 # addresses routinely push the actual country name further from its
 # label than 200 chars covers.
+# Was 400: raised after two more confirmed real invoices missed even that.
+# Both are wide, heavily multi-column layouts -- pdf_reader.py's 2D layout
+# canvas preserves column alignment with long runs of literal whitespace,
+# so on these documents "400 raw characters after the label" covers only
+# 2-3 visual lines, not the 4-6 a multi-line address block plus a GST/VAT
+# field routinely needs. Confirmed distances: an APTIV customs-clearance
+# invoice ("Ship To" -> "...KANCHIPURAM 602105 INDIA") at 600 chars, and a
+# Gold Circuit Electronics invoice ("SHIP TO" -> "...SRIPERUMBUDUR,INDIA")
+# at 534 chars. Still bounded by other_side_starts in
+# _label_proximity_hits, so this can't overrun into the OTHER party's own
+# address block -- only the single-party window past the label is wider.
 _LABEL_PROXIMITY_POINTS = _STRONG_POINTS
 
 # Search window for _origin_destination_signal's single-label fallback
@@ -298,6 +322,28 @@ def _label_proximity_hits(
             next_other = min((p for p in other_side_starts if p > m.end()), default=None)
             if next_other is not None:
                 window_end = min(window_end, next_other)
+            # Also capped at the next Country of Origin/Destination label,
+            # if one falls inside the window: that field describes the
+            # GOODS' origin/destination, not this party's own address, but
+            # sits in the same free-floating shipment-details block a
+            # buyer/consignee address often lives right next to. Confirmed
+            # real false positive without this cap, after widening
+            # _LABEL_PROXIMITY_WINDOW to 900 to reach genuinely distant
+            # addresses (see that constant's docstring): a "Consignee"
+            # label's widened window on a real EXPORT invoice (Nash
+            # Industries India -> Ennoconn Hungary) reached past the
+            # consignee's own Hungary address into a LATER "Country of
+            # Origin of Goods: India" field, wrongly registering the
+            # Hungarian consignee as being in India. The origin/destination
+            # value there is correctly India (goods made in India), which
+            # is exactly why it must not be mistaken for the ADDRESS of
+            # whichever party label started this window.
+            origin_or_dest = _ORIGIN_LABEL_RE.search(text_lower, m.end())
+            dm = _DEST_LABEL_RE.search(text_lower, m.end())
+            if dm is not None and (origin_or_dest is None or dm.start() < origin_or_dest.start()):
+                origin_or_dest = dm
+            if origin_or_dest is not None:
+                window_end = min(window_end, origin_or_dest.start())
             window = _same_column_window(text_lower, m.end(), window_end)
             if _has_own_india(window):
                 hits += 1

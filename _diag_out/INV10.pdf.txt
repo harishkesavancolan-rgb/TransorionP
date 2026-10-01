@@ -1,0 +1,43 @@
+=================================== PAGE 1 OF 2 (INV10.pdf) ===================================
+            MT.DERM
+                                                                         Salesperson     │    Inside Sales
+                MT.DERM GmbH - Blohmstr. 37-61 - DE - 12307 Berlin   │  E-Mail       │       info@mtderm.de
+                MT.DERM   Medical Products Pvt Ltd
+                                                                        Customer      │      20206
+                CHILAMPARASANV
+                                                                        E-Mail       │       v.chilamparasan@mtderm.in
+                No 2 D, Nellikuppam Road
+                                                                        Order Type      │     Standardauftrag
+                Karanaipudhucheri Village               │               WEEE        │        45993980
+                Guduvanchery, 603202
+                Indial
+         Invoice                 │                 26-R05015            │           Date   │  2026.04.02
+                                                                                    Page  1
+         Order No.    │   26-AU02797      Order Date        24.03.26
+         No.          │         Description                      Quantity Unit      │     Unit Price                            VAT
+                                                              Package  Co          │         Disc. %             Amount
+         Shipment       │       26-L04999  v. 02.04.26
+         PSF-6033       │       INK, TIJ,LS-3001 SU-B BLACK,      │     6 à 1 pc       │       87,70                               이
+                                                                                                                  526,20
+                                 Country of origin            │           Germany          │         Tariff No. 00000000
+                                Sample  sleeve for Dermatude      │     1 à 1 pc        │       1,00                               0
+                                                                                                                     1,00
+         VERSAND        │       shipping cost             │             1 à 1 pc    │    Free                   │                  이
+                                                                                 Total EUR            │           527,20
+         Unternehmenssitz      │      Handelsregister        │       Geschäftsführer      │      Bankverbindung
+         MT.DERM GmbH        │        Amtsgericht Berlin-Charlottenburg│Jörn Kluge & Jan-Hendrik Andreae│Deutsche Bank AG
+         Blohmstr. 37-61      │      HRB 70730                          │                         IBAN: DE94100700000414203000
+         12307 Berlin        │        USt.-IDNr. DE812717153    │   www.mtderm.de        │       BIC (SWIFT-Code): DEUTDEBBXXX
+
+=================================== PAGE 2 OF 2 (INV10.pdf) ===================================
+             MT.DERM
+                                                                                               Date      │     2026.04.02
+          Invoice       26-R05015
+                                                                                               Page   2
+          In addition to the above, our GTC at https://www.mtderm.de/agb/   apply.
+          Shipment  Method:    │    EXW  - Ex Works
+          Payment   until 29.09.26 without discount:                                 │                                 527,20  EUR
+          Unternehmenssitz        │       Handelsregister         │         Geschäftsführer        │        Bankverbindung
+          MT.DERM  GmbH         │         Amtsgericht Berlin-Charlottenburg│Jörn Kluge & Jan-Hendrik Andreae│Deutsche Bank AG
+          Blohmstr. 37-61        │        HRB 70730                            │                            IBAN: DE94100700000414203000
+          12307 Berlin          │         USt.-IDNr. DE812717153      │     www.mtderm.de         │         BIC (SWIFT-Code): DEUTDEBBXXX

@@ -1,0 +1,82 @@
+[
+  {
+    "file": "003160840373.INV.STR.HPS.CST.20260811.180620.20260812.011158.229981.pdf",
+    "status": "ok",
+    "shipment_type": "import",
+    "items": 3,
+    "warnings": 0,
+    "validation": "validated",
+    "elapsed": 172.3,
+    "cost_inr": 0.9632
+  },
+  {
+    "file": "20260728161255389.pdf",
+    "status": "ok",
+    "shipment_type": "import",
+    "items": 3,
+    "warnings": 1,
+    "validation": "validation_failed (1 errors)",
+    "elapsed": 232.7,
+    "cost_inr": 3.049
+  },
+  {
+    "file": "455024201.pdf",
+    "status": "skipped: table clipped",
+    "elapsed": 0.7
+  },
+  {
+    "file": "6810995125_Commercial Invoice_1.pdf",
+    "status": "ok",
+    "shipment_type": "import",
+    "items": 5,
+    "warnings": 0,
+    "validation": "validated",
+    "elapsed": 171.9,
+    "cost_inr": 2.2605
+  },
+  {
+    "file": "Commercial Invoice 11.pdf",
+    "status": "skipped: table clipped",
+    "elapsed": 0.6
+  },
+  {
+    "file": "2710_001.pdf",
+    "status": "skipped: table clipped",
+    "elapsed": 0.7
+  },
+  {
+    "file": "2553936162.pdf",
+    "status": "ok",
+    "shipment_type": "import",
+    "items": 35,
+    "warnings": 2,
+    "validation": "validation_failed (26 errors)",
+    "elapsed": 841.3,
+    "cost_inr": 15.4144
+  },
+  {
+    "file": "24299.pdf",
+    "status": "ok",
+    "shipment_type": "export",
+    "items": 20,
+    "warnings": 2,
+    "validation": "validation_failed (36 errors)",
+    "elapsed": 827.3,
+    "cost_inr": 6.5151
+  },
+  {
+    "file": "INV10.pdf",
+    "status": "ok",
+    "shipment_type": "import",
+    "items": 3,
+    "warnings": 0,
+    "validation": "validated",
+    "elapsed": 77.2,
+    "cost_inr": 0.4126
+  },
+  {
+    "file": "INV1_1.pdf",
+    "status": "skipped: table clipped",
+    "elapsed": 0.4
+  }
+]

@@ -79,14 +79,21 @@ AMOUNT_TOLERANCE = Decimal("0.05")
 RETRYABLE_RULES = {
     "REQUIRED_FIELD_MISSING",
     "QTY_X_UNIT_PRICE",
-    "HEADER_LINE_TOTAL",
     "TAX_RECONCILIATION",
     "PART_NUMBER_SOURCE_MATCH",
     "ORDER_NUMBER_SOURCE_MATCH",
     "MODEL_SOURCE_MATCH",
     "COUNTRY_OF_ORIGIN_CONSISTENCY",
     "FORMAT_TYPE",
+    "MULTI_INVOICE_TOTAL_SPLIT",
 }
+# HEADER_LINE_TOTAL is deliberately NOT here despite being an ERROR-level
+# rule (see validate_totals): a confirmed real retry on this exact rule
+# overwrote an already-correct invoice_total with a wrong one just to force
+# agreement with a sum that was itself the ambiguous side of the mismatch.
+# It should still fail validation (hence ERROR, not WARNING) so a human
+# reviews it, but never hand the file back to the model hoping it "fixes"
+# itself -- that's precisely the failure mode confirmed here.
 
 
 # ── Result structures ───────────────────────────────────────────────────
@@ -185,7 +192,24 @@ _ITEM_FIELDS: dict[str, dict[str, str | None]] = {
 # mapped_rows loop), independent of which template applies.
 _COMMON_ITEM_FIELDS = ("part_number", "model_or_type", "order_number")
 
-_REQUIRED_ITEM_CONCEPTS = ("ser_no", "description", "quantity", "unit", "unit_price")
+_REQUIRED_ITEM_CONCEPTS = ("ser_no", "description", "quantity", "unit_price")
+# "unit" (Item_Unit1 / Item_Unit) is deliberately NOT in this list.
+# Confirmed real case: a 10-page, 38-line export invoice ("Purchase
+# Acceptance Document" style) had no unit-of-measure column printed
+# ANYWHERE in the document -- every page's table was Purchase |
+# Acceptance | Document No | Line | ... | HSN of Goods/SAC | Unit Price |
+# Amount, with quantity/unit_price/line-amount all extracted correctly
+# and arithmetically consistent, but genuinely no "PCS"/"NOS"/"EA"/UOM
+# token anywhere to extract. Treating unit as REQUIRED+retryable there
+# burned 2 full re-extraction attempts (of BOTH the header and item
+# passes need_items gates on ANY item-level retryable error) that could
+# never succeed -- there's nothing on the page a retry could find.
+# Unlike invoice_number (kept required: a document can legitimately have
+# no invoice number, but that's rare enough, and important enough for
+# customs filing, that it's still worth flagging and retrying), a missing
+# unit is common enough on real invoices and low-stakes enough that it's
+# left ungated here -- still captured when present, never blocks
+# validation or forces a retry when it's genuinely not printed.
 
 
 def _item_field(shipment_type: str, concept: str) -> str | None:
@@ -212,6 +236,22 @@ def _to_decimal(value: Any) -> Decimal | None:
         return None
 
 
+# Separator between sub-invoices in a combined document's invoice_number /
+# invoice_total (the prompt's own " / " convention -- see llm_extract.py's
+# _HEADER_SYSTEM_PROMPT). Needs whitespace on at least one side: a bare "/"
+# is part of an ordinary Indian invoice number ("KA/2627/I/033552",
+# "EXPU2/2627/0612"), not a separator -- splitting on it turned every such
+# single invoice into a fake multi-part one and failed
+# MULTI_INVOICE_TOTAL_SPLIT on all of them.
+_COMBINED_SEPARATOR_RE = re.compile(r"\s+/\s*|\s*/\s+")
+
+
+def _split_combined(value: Any) -> list[str]:
+    """Split a combined-document field on its " / " separator; a value
+    with no such separator comes back as a single part."""
+    return [p.strip() for p in _COMBINED_SEPARATOR_RE.split(str(value or "")) if p.strip()]
+
+
 def _normalize_token(s: Any) -> str:
     """Uppercase, strip, collapse internal whitespace -- for comparing
     codes/numbers that may have incidental spacing differences between
@@ -229,14 +269,16 @@ def validate_required_fields(
     items: list[dict[str, Any]], shipment_type: str
 ) -> list[ValidationCheck]:
     """
-    REQUIRED: ser_no, description, quantity, unit, unit_price -- a row
-    without these isn't a usable line item on either template.
+    REQUIRED: ser_no, description, quantity, unit_price -- a row without
+    these isn't a usable line item on either template.
     CONDITIONAL (handled implicitly, not as a hardcoded list): a concept
     that has no column on this shipment type's template (e.g. BOE has no
     line-amount column) is simply never checked for it -- that's the
     schema-driven distinction the spec asks for, not a blanket "every
     field must be filled" pass over both templates' full column sets.
-    OPTIONAL: everything else (model_or_type, ...) is never flagged here.
+    OPTIONAL: everything else (model_or_type, unit, ...) is never flagged
+    here -- see _REQUIRED_ITEM_CONCEPTS's comment for why unit specifically
+    was moved out of the required set.
     """
     checks = []
     for idx, item in enumerate(items, start=1):
@@ -351,11 +393,9 @@ def _parse_header_total(header: dict[str, Any]) -> Decimal | None:
     single = _to_decimal(raw)
     if single is not None:
         return single
-    invoice_number = str(header.get("invoice_number") or "")
-    if "/" not in invoice_number:
+    if len(_split_combined(header.get("invoice_number"))) < 2:
         return None
-    parts = [p.strip() for p in str(raw).split("/")]
-    decimals = [d for d in (_to_decimal(p) for p in parts) if d is not None]
+    decimals = [d for d in (_to_decimal(p) for p in _split_combined(raw)) if d is not None]
     return sum(decimals, Decimal("0")) if decimals else None
 
 
@@ -390,6 +430,47 @@ def validate_totals(
     directly to them -- see the module docstring's point on this.
     """
     checks = []
+
+    # MULTI_INVOICE_TOTAL_SPLIT: when invoice_number holds N "/"-separated
+    # sub-invoices, invoice_total must hold the SAME N "/"-separated parts
+    # (the prompt's own documented convention -- see llm_extract.py's
+    # invoice_total field instructions). Checked independently of, and
+    # BEFORE, the amount-column/line-sum logic below, specifically because
+    # the confirmed real failure this catches had NO per-line amounts
+    # extracted at all: a combined document ("944624267 / 944624264")
+    # where the model correctly split invoice_number but invented a single
+    # invoice_total ("5888", the sum of the two sub-invoices' real totals,
+    # not a value printed anywhere) -- with no line amounts to sum, the
+    # HEADER_LINE_TOTAL check below falls through to NOT_CHECKED and never
+    # runs, so this was the ONLY thing that could have caught it.
+    #
+    # In RETRYABLE_RULES (unlike HEADER_LINE_TOTAL): this isn't the
+    # ambiguous "document vs extraction" case that rule exists for -- a
+    # combined document's own total structurally MUST mirror its
+    # invoice_number structure by this pipeline's own convention, so
+    # there's no legitimate single-number answer to protect by refusing a
+    # retry.
+    invoice_number_raw = str(header.get("invoice_number") or "").strip()
+    invoice_number_parts = _split_combined(invoice_number_raw)
+    invoice_total_raw = header.get("invoice_total")
+    if len(invoice_number_parts) > 1 and invoice_total_raw not in (None, ""):
+        invoice_total_parts = _split_combined(invoice_total_raw)
+        if len(invoice_total_parts) != len(invoice_number_parts):
+            checks.append(ValidationCheck(
+                rule="MULTI_INVOICE_TOTAL_SPLIT", status="ERROR", field="invoice_total",
+                expected=f"{len(invoice_number_parts)} '/'-separated total(s), one per sub-invoice",
+                actual=invoice_total_raw,
+                message=(
+                    f"invoice_number holds {len(invoice_number_parts)} combined sub-invoices "
+                    f"(\"{invoice_number_raw}\") but invoice_total has "
+                    f"{len(invoice_total_parts)} part(s) (\"{invoice_total_raw}\") instead of "
+                    f"{len(invoice_number_parts)}. Find EACH sub-invoice's own explicitly "
+                    f"printed total and join them with \" / \" in the same order as "
+                    f"invoice_number -- do not compute, sum, or otherwise deduce a single "
+                    f"combined figure."
+                ),
+            ))
+
     amount_col = _item_field(shipment_type, "line_amount")
     invoice_total = _parse_header_total(header)
 
@@ -417,32 +498,57 @@ def validate_totals(
             expected=calculated_total, actual=invoice_total, difference=diff,
         ))
     else:
-        # WARNING, not ERROR/retryable: a mismatch here is genuinely
-        # ambiguous -- it means either the extraction misread the total,
-        # OR the source document's own printed total simply doesn't equal
-        # the sum of its own line items (confirmed real case: a Piramal
-        # export invoice listed two items in its table, 51,166.08 and
-        # 27,216.00, but its own printed "Grand Total" line -- and the
+        # ERROR, but deliberately NOT retryable: a mismatch here is
+        # genuinely ambiguous -- it means either the extraction misread the
+        # total, OR the source document's own printed total simply doesn't
+        # equal the sum of its own line items (confirmed real case: a
+        # Piramal export invoice listed two items in its table, 51,166.08
+        # and 27,216.00, but its own printed "Grand Total" line -- and the
         # amount spelled out in words right next to it -- read only
         # 51,166.08, excluding the second item entirely; a genuine
         # arithmetic slip in the source PDF, not an extraction error).
         # There's no reliable way to tell those two cases apart from the
         # numbers alone, and retryable=True here can ONLY ever push the
         # model toward "matches the sum" -- so on the document-error case
-        # it actively overwrites an already-correct value with a wrong
-        # one (confirmed: that exact file passed attempt 1 with the
-        # correct 51,166.08, got flagged ERROR, and "fixed" itself into
-        # the wrong 78,382.08 on retry). A WARNING still surfaces the
-        # mismatch for a human to check, without forcing a correction
-        # that's as likely to be wrong as right.
+        # it actively overwrites an already-correct value with a wrong one
+        # (confirmed: that exact file passed attempt 1 with the correct
+        # 51,166.08, got flagged ERROR+retryable, and "fixed" itself into
+        # the wrong 78,382.08 on retry).
+        #
+        # Was a WARNING (not ERROR at all) for exactly that reason -- but
+        # that swung too far the other way: a WARNING never fails
+        # validation, so a file still lands in "valid" output even when its
+        # own header total is provably inconsistent with its own line
+        # items. Confirmed real case this let through silently: a combined
+        # two-sub-invoice document ("944624267 / 944624264") where the
+        # model correctly split invoice_number into both numbers but
+        # invented a single invoice_total ("5888") that's the SUM of the
+        # two sub-invoices' real totals -- not a value printed anywhere --
+        # and since neither item row had its own amount extracted, this
+        # check never even ran (NOT_CHECKED), so the hallucinated total
+        # reached "valid" output with zero signal at all.
+        #
+        # ERROR (this file needs a human to look at it) + non-retryable
+        # (never hand it back to the model to "fix" on its own) gets both
+        # halves right: a real mismatch -- however it arose -- no longer
+        # passes as valid, but it also never triggers the exact
+        # self-correction-into-a-wrong-value failure mode confirmed above.
+        # Enforced by *removing* "HEADER_LINE_TOTAL" from RETRYABLE_RULES,
+        # not just setting retryable=False here -- the aggregation step in
+        # validate_invoice() only ever sets retryable=True for a rule
+        # that's in that set, so leaving it out is what actually prevents
+        # a retry, this flag here is just explicit documentation of that.
         checks.append(ValidationCheck(
-            rule="HEADER_LINE_TOTAL", status="WARNING", field="invoice_total",
+            rule="HEADER_LINE_TOTAL", status="ERROR", field="invoice_total",
             expected=calculated_total, actual=invoice_total, difference=diff,
+            retryable=False,
             message=(
                 f"Header invoice_total {invoice_total} does not match calculated "
                 f"line total {calculated_total} (difference: {diff}). This may be a "
                 f"genuine mismatch printed on the source document itself, not "
-                f"necessarily an extraction error -- verify against the document."
+                f"necessarily an extraction error -- verify against the document. "
+                f"Not auto-retried: a past retry on this exact rule overwrote an "
+                f"already-correct total with a wrong one to force a match."
             ),
         ))
     return checks
@@ -1105,7 +1211,7 @@ def validate_invoice(
 # feedback to the header-extraction pass, the line-items pass, or both,
 # so a re-extraction attempt only re-runs (and re-spends tokens on) the
 # LLM pass that actually needs correcting. See reextraction.py.
-_HEADER_RULES = {"HEADER_LINE_TOTAL"}
+_HEADER_RULES = {"HEADER_LINE_TOTAL", "MULTI_INVOICE_TOTAL_SPLIT"}
 _ITEM_RULES = {
     "QTY_X_UNIT_PRICE", "TAX_RECONCILIATION", "PART_NUMBER_SOURCE_MATCH",
     "MODEL_SOURCE_MATCH", "ORDER_NUMBER_SOURCE_MATCH", "QTY_VS_TARIFF_QTY",

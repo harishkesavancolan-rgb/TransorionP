@@ -202,3 +202,24 @@ def test_header_guardrails_are_applied_through_extract_and_validate(monkeypatch)
     ))
 
     assert result["header"]["net_realisable_amount"] == ""
+
+
+def test_country_guardrail_does_not_rewrite_import_origin(monkeypatch):
+    # extract_and_validate must pass its shipment_type through to
+    # apply_header_guardrails: on an import, destination is always India,
+    # so the export-only origin correction must not turn a real foreign
+    # origin into "IN" just because the supplier address mentions India.
+    import_schema = load_template_schema(TEMPLATE_PATH["import"])
+    header = {
+        **_valid_header(),
+        "supplier_address": "Liaison Office: 12 MG Road, Bengaluru, India",
+        "country_of_origin": "CHINA", "country_of_destination": "INDIA",
+    }
+    monkeypatch.setattr(reextraction, "extract_invoice_header", _Sequenced([header]))
+    monkeypatch.setattr(reextraction, "extract_line_items", _Sequenced([[_valid_item()]]))
+
+    result = _run(reextraction.extract_and_validate(
+        "INVOICE TEXT", import_schema, "import", max_retries=0,
+    ))
+
+    assert result["header"]["country_of_origin"] == "CHINA"

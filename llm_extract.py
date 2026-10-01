@@ -262,7 +262,7 @@ IMPORTANT: consignee_name and buyer_name are two DIFFERENT company names printed
 IMPORTANT: supplier_address / buyer_address / consignee_address must contain ONLY physical address lines (building/street/area/city/state/postal code/country) -- NEVER a Tax ID, GSTIN, CIN, Registration Number, or similar identifier, even when it's printed glued to the same line as an address line, or stacked directly below the address in the same column with no visible label separating them. Confirmed real misses: a buyer's own postal code had "TAX ID : 83-2387668" printed right after it on the same line with no separator ("53188-1615  TAX ID : 83-2387668") and that tax ID got wrongly appended into buyer_address; a supplier's address block had "C Ex Reg No:", "GSTIN :", and "CIN:" lines stacked immediately below it in the same left column, and those got wrongly absorbed into supplier_address. Recognize these by their own label/pattern (a "TAX ID"/"GSTIN"/"CIN"/"Reg No" prefix, or a code matching a GSTIN/CIN/registration-number shape) and stop the address there -- route GSTIN/tax-ID specifically to supplier_tax_id if that's what it is, and simply omit the rest (CIN, Reg No) if there is no dedicated field for it, rather than letting it bleed into the address string.
 
 - currency: Invoice Currency code (e.g. "USD", "EUR", "INR", "GBP") (string or null)
-- invoice_total: The actual amount chargeable/payable to the buyer, in the SAME currency you put in `currency` above (numeric or null). Prefer a line explicitly labeled "Amount Chargeable", "Grand Total", or "Total Invoice Value"; otherwise use the sum of the line-item totals. CRITICAL: NEVER use a "Total F.O.B Value" / "FOB Value" line for this field. On Indian export invoices that value is routinely printed in INR for customs/RBI declaration purposes even when the invoice's trade currency is USD/EUR/etc -- using it here silently mixes a rupee figure into a field tagged with the wrong currency. If the only total-like number you can find is explicitly labeled "F.O.B Value", leave invoice_total null rather than use it. CRITICAL -- if invoice_number above holds MORE THAN ONE invoice number (a combined document): do NOT sum the invoices' totals into one number. Confirmed real case: two FULLY SEPARATE, independently-numbered invoices (each its own header, its own items, its own explicitly printed "TOTAL INVOICE AMOUNT" line -- 4,416.00 for one, 1,472.00 for the other) were bundled into a single PDF; the correct invoice_total is "4416.00 / 1472.00", NOT "5888" (their sum) -- 5888 is not a real amount printed anywhere and doesn't belong to either invoice. Instead, find EACH sub-invoice's own explicitly printed total (same labels as above: "Amount Chargeable", "Grand Total", "Total Invoice Value", "Total Invoice Amount") and join them with " / " in the SAME order as their invoice numbers in invoice_number, so total N corresponds to invoice number N -- exactly like invoice_date does. Only fall back to summing line items for a given sub-invoice if that sub-invoice has no total of its own explicitly printed.
+- invoice_total: The actual amount chargeable/payable to the buyer, in the SAME currency you put in `currency` above (numeric or null). ONLY extract a value that is EXPLICITLY PRINTED on the document itself under a label such as "Amount Chargeable", "Grand Total", or "Total Invoice Value". NEVER compute, sum, derive, or otherwise deduce this field from the line items yourself, even as a fallback when no explicit total is printed -- if there is no explicitly labeled total anywhere on the document, leave invoice_total null. A number you calculated is not the same thing as a number the document states, and this field must only ever hold the latter; a separate, deterministic check elsewhere reconciles the printed total against the line items -- that is not your job, and guessing at it yourself only hides a real mismatch instead of surfacing it. CRITICAL: NEVER use a "Total F.O.B Value" / "FOB Value" line for this field. On Indian export invoices that value is routinely printed in INR for customs/RBI declaration purposes even when the invoice's trade currency is USD/EUR/etc -- using it here silently mixes a rupee figure into a field tagged with the wrong currency. If the only total-like number you can find is explicitly labeled "F.O.B Value", leave invoice_total null rather than use it. CRITICAL -- if invoice_number above holds MORE THAN ONE invoice number (a combined document): do NOT sum the invoices' totals into one number. Confirmed real case: two FULLY SEPARATE, independently-numbered invoices (each its own header, its own items, its own explicitly printed "TOTAL INVOICE AMOUNT" line -- 4,416.00 for one, 1,472.00 for the other) were bundled into a single PDF; the correct invoice_total is "4416.00 / 1472.00", NOT "5888" (their sum) -- 5888 is not a real amount printed anywhere and doesn't belong to either invoice. Instead, find EACH sub-invoice's own explicitly printed total (same labels as above: "Amount Chargeable", "Grand Total", "Total Invoice Value", "Total Invoice Amount") and join them with " / " in the SAME order as their invoice numbers in invoice_number, so total N corresponds to invoice number N -- exactly like invoice_date does. If a given sub-invoice has no total of its own explicitly printed, its own position in this " / "-joined value is null, not a computed figure.
 - net_realisable_amount: Net Realisable / Net Chargeable Amount after deductions (numeric or null). CRITICAL: Extract ONLY if explicitly labeled as "Net Realisable", "Net Chargeable", or "Realizable Value". NEVER map "Assessable Value", "Taxable Value", or "Total Amount" into this field. If not explicitly labeled as net realisable/chargeable, return null.
 - tax_amount: Total Tax / IGST Amount (numeric or null)
 - tax_rate: Tax Rate (e.g. "18%") if explicitly stated (string or null)
@@ -395,6 +395,21 @@ async def extract_invoice_header(
     )
     if not _is_reasoning_model(model):
         request_kwargs["response_format"] = {"type": "json_object"}
+    # NOT setting reasoning_effort/verbosity here (unlike the line-items
+    # pass below) -- tried "minimal" and "low" on a real invoice
+    # (INV10.pdf) whose buyer is only identifiable by inference (no "Bill
+    # To"/"Ship To" label at all, just a company name printed under the
+    # sender's own letterhead): "minimal" left buyer_name/consignee_name
+    # BLANK entirely, and "low" filled buyer_name with "CHILAMPARASANV" --
+    # a contact person's name, not the actual buyer company -- where the
+    # unrestricted default effort got the correct company name both times.
+    # The header pass's fields more often need this kind of inference
+    # (unlabeled recipient blocks, inferring country of origin/destination,
+    # reconciling conflicting values) than the line-items pass does, so the
+    # savings here aren't worth a confirmed, reproducible accuracy
+    # regression on exactly the fields this whole pipeline exists to get
+    # right. Revisit only with a broader accuracy comparison across many
+    # documents, not cost alone.
 
     logger.info("Calling OpenAI (Pass 1 - Header): model=%s", model)
     resp = await _call_header_model(client, request_kwargs)
@@ -438,6 +453,13 @@ async def extract_line_items(
     )
     if not _is_reasoning_model(model):
         request_kwargs["response_format"] = {"type": "json_object"}
+    else:
+        # See extract_invoice_header's matching comment -- same reasoning:
+        # this is table transcription against text already provided, not a
+        # task that benefits from GPT-5's (expensive, output-billed) deep
+        # reasoning.
+        request_kwargs["reasoning_effort"] = "minimal"
+        request_kwargs["verbosity"] = "low"
 
     logger.info("Calling OpenAI (Pass 2 - Line Items): model=%s", model)
     resp = await _call_line_items_model(client, request_kwargs)
@@ -473,6 +495,34 @@ _PAGE_MARKER_RE = re.compile(r"^=+\s*PAGE\s+\d+\s+OF\s+\d+", re.MULTILINE)
 # pipeline processes -- are unaffected by this threshold.
 _LINE_ITEMS_CHUNK_PAGE_THRESHOLD = 3
 
+# Confirmed real case: a 45-page invoice split into 45 page-chunk calls, all
+# fired at once via asyncio.gather with no throttling, saturated the org's
+# 200,000 TPM rate limit in a single burst -- every one of tenacity's 4
+# retry attempts hit the exact same limit again, since a retry just re-fires
+# the whole unthrottled burst rather than spacing it out. A semaphore here
+# caps how many page-chunk calls are ever in flight at once, so a large
+# document's total token demand gets spread across multiple sequential
+# waves instead of arriving as one spike. Left generous enough that it only
+# meaningfully changes behavior for documents already past
+# _LINE_ITEMS_CHUNK_PAGE_THRESHOLD pages -- a normal short invoice never
+# creates enough chunks to hit this cap anyway.
+_LINE_ITEMS_CHUNK_CONCURRENCY = 4
+
+# How many per-page chunks (from _split_text_by_page) get grouped into one
+# LLM call. >1 trades some of the row-dropping safety margin above for
+# fewer calls -- each call re-pays the full system prompt (~2,500 tokens)
+# and its own separate reasoning-model invocation overhead, so a 45-page
+# document at pages_per_chunk=1 (45 calls) vs =2 (23 calls) roughly halves
+# that per-call cost. Kept deliberately small (2, not higher) given the
+# confirmed 8-page/~43,000-char failure documented above: that's the
+# actual ceiling this constant must stay well under, and 2 pages hasn't
+# been independently verified against a table-dense document as part of
+# THIS change -- validate row-completeness (item count, not just cost)
+# against a known page-dense large invoice before raising this further.
+# If any row-dropping reappears at this size, revert to 1 (the original
+# per-page behavior).
+_LINE_ITEMS_PAGES_PER_CHUNK = 2
+
 
 def _split_text_by_page(text: str) -> list[str]:
     """
@@ -490,6 +540,19 @@ def _split_text_by_page(text: str) -> list[str]:
     return [text[starts[i]:starts[i + 1]] for i in range(len(starts) - 1)]
 
 
+def _group_pages_into_chunks(pages: list[str], pages_per_chunk: int) -> list[str]:
+    """Groups consecutive per-page chunks (from `_split_text_by_page`) into
+    larger chunks of `pages_per_chunk` pages each, joined so every page's
+    own "PAGE N OF M" marker stays intact and visible to the model. This
+    cuts the number of separate LLM calls roughly `pages_per_chunk`-fold
+    (see `_LINE_ITEMS_PAGES_PER_CHUNK`) without changing what content the
+    model sees overall -- the same total text, just batched into fewer
+    calls. `pages_per_chunk <= 1` is a no-op (returns `pages` unchanged)."""
+    if pages_per_chunk <= 1:
+        return pages
+    return ["\n\n".join(pages[i:i + pages_per_chunk]) for i in range(0, len(pages), pages_per_chunk)]
+
+
 async def extract_line_items_chunked(
     invoice_text: str,
     tables_text: str = "",
@@ -500,18 +563,19 @@ async def extract_line_items_chunked(
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """
     Drop-in replacement for extract_line_items() -- same signature, same
-    return shape -- that splits the line-items pass into one call per
-    page for large, multi-page tables, then concatenates the results in
-    page order. Falls back to a single plain extract_line_items() call
-    for anything at or under _LINE_ITEMS_CHUNK_PAGE_THRESHOLD pages, so
-    the overwhelming majority of (short) invoices this pipeline sees are
-    completely unaffected -- this only changes behavior for the large
-    tables that were actually losing rows.
+    return shape -- that splits the line-items pass into calls of up to
+    _LINE_ITEMS_PAGES_PER_CHUNK pages each for large, multi-page tables,
+    then concatenates the results in page order. Falls back to a single
+    plain extract_line_items() call for anything at or under
+    _LINE_ITEMS_CHUNK_PAGE_THRESHOLD pages, so the overwhelming majority of
+    (short) invoices this pipeline sees are completely unaffected -- this
+    only changes behavior for the large tables that were actually losing
+    rows.
 
-    On a retry (`feedback` set), every page chunk is re-run with the SAME
+    On a retry (`feedback` set), every chunk is re-run with the SAME
     overall feedback text, rather than trying to map specific validator
     findings -- indexed into the FLAT, already-merged item list -- back
-    to the one page chunk that produced them. That mapping isn't
+    to the one chunk that produced them. That mapping isn't
     reliable to reconstruct, and isn't needed often enough to be worth
     the complexity: most retryable item-level rules (e.g.
     QTY_X_UNIT_PRICE) describe a self-contained check a chunk can re-verify
@@ -528,15 +592,20 @@ async def extract_line_items_chunked(
         )
 
     import asyncio
+    chunks = _group_pages_into_chunks(pages, _LINE_ITEMS_PAGES_PER_CHUNK)
     logger.info(
         "Line-items pass: %d pages exceeds the %d-page single-call threshold -- "
-        "splitting into %d per-page calls",
-        len(pages), _LINE_ITEMS_CHUNK_PAGE_THRESHOLD, len(pages),
+        "splitting into %d calls of up to %d page(s) each (max %d concurrent)",
+        len(pages), _LINE_ITEMS_CHUNK_PAGE_THRESHOLD, len(chunks), _LINE_ITEMS_PAGES_PER_CHUNK,
+        _LINE_ITEMS_CHUNK_CONCURRENCY,
     )
-    page_results = await asyncio.gather(*(
-        extract_line_items(page_text, model=model, api_key=api_key, feedback=feedback)
-        for page_text in pages
-    ))
+    semaphore = asyncio.Semaphore(_LINE_ITEMS_CHUNK_CONCURRENCY)
+
+    async def _bounded_extract(chunk_text: str):
+        async with semaphore:
+            return await extract_line_items(chunk_text, model=model, api_key=api_key, feedback=feedback)
+
+    page_results = await asyncio.gather(*(_bounded_extract(chunk_text) for chunk_text in chunks))
 
     items: list[dict[str, Any]] = []
     total_usage = {"input_tokens": 0, "cached_tokens": 0, "output_tokens": 0}
@@ -552,12 +621,16 @@ def apply_header_guardrails(
     header_raw: dict[str, Any] | None,
     items_raw: list[dict[str, Any]] | None,
     invoice_text: str,
+    shipment_type: str | None = None,
 ) -> None:
     """
     Deterministic, source-text-anchored corrections applied to a header
     extraction after the LLM call returns -- belt-and-suspenders checks
     for confirmed real mistakes the prompt alone doesn't reliably avoid
     on its own. Mutates `header_raw` in place; a no-op if it isn't a dict.
+
+    `shipment_type` gates the export-only country_of_origin correction
+    below; anything other than "export" (including None) skips it.
 
     Called from reextraction.py's retry loop -- the actual production
     entry point every real run goes through. This function used to be
@@ -685,6 +758,15 @@ def apply_header_guardrails(
     # exporter is who the goods originate from unless a transhipment /
     # re-export is separately indicated (transit_country), which neither
     # of these two cases claims.
+    #
+    # Export only: on an import the destination is ALWAYS India, so case 2
+    # fires on every import whose supplier address merely mentions India
+    # (an India liaison office, a reseller) and overwrote a real foreign
+    # origin with "IN". "INDIA" is also matched as a whole word, so a US
+    # supplier in Indiana / Indianapolis doesn't count as Indian.
+    if shipment_type != "export":
+        return
+
     def _country_norm(s: Any) -> str:
         s = str(s or "").strip().upper()
         if s in ("INDIA", "IND", "IN"):
@@ -694,7 +776,7 @@ def apply_header_guardrails(
     supplier_addr = str(header_raw.get("supplier_address") or "").upper()
     origin = _country_norm(header_raw.get("country_of_origin"))
     dest = _country_norm(header_raw.get("country_of_destination"))
-    supplier_is_indian = "INDIA" in supplier_addr
+    supplier_is_indian = re.search(r"\bINDIA\b", supplier_addr) is not None
     if supplier_is_indian and origin and origin != "IN" and (origin == dest or dest == "IN"):
         header_raw["country_of_origin"] = "IN"
 

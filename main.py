@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from schema import load_template_schema
-from pdf_reader import extract_text
+from pdf_reader import extract_text, check_scan_quality, ClippedTableError
 from reextraction import extract_and_validate, MAX_REEXTRACTION_ATTEMPTS
 from detect_type import detect_shipment_type, AmbiguousShipmentTypeError
 from templates_config import TEMPLATE_PATH, ITEM_SHEET_NAME
@@ -55,8 +55,33 @@ async def run(
     template_path: str | None = None,
     force_ocr: bool | None = None,
     max_retries: int = MAX_REEXTRACTION_ATTEMPTS,
+    allow_clipped: bool = False,
 ) -> dict:
     start_time = time.perf_counter()
+
+    # A clipped table border means a row/column of the ACTUAL table is
+    # physically missing from the scan -- not a quality problem OCR or the
+    # LLM can work around. Checked here, BEFORE extract_text() runs (this
+    # cheap check reuses the same scan_validator result extract_text()
+    # would otherwise compute internally, but doesn't pay for the OCR pass
+    # that follows it): an extraction run against known-incomplete source
+    # data is a wasted OCR pass and LLM call producing a result nobody
+    # should trust as complete. Confirmed real case: 24299.pdf's scan had
+    # "Table border line(s) touch the page edge at: bottom, top" flagged
+    # by this same check, yet a prior run let extraction proceed anyway --
+    # spending 443s of OCR plus an LLM call -- before producing a
+    # plausible-looking but silently incomplete item table; catching it
+    # here instead means the file never reaches OCR or the LLM at all.
+    # `allow_clipped=True` is the explicit override for a human who's
+    # confirmed the clipping doesn't affect the fields they need, the same
+    # role --type plays for an unresolved shipment-type detection below.
+    precheck_scan_quality = check_scan_quality(pdf_path)
+    if precheck_scan_quality and precheck_scan_quality.get("clipped") and not allow_clipped:
+        raise ClippedTableError(
+            f"Table border(s) touch the page edge ({', '.join(precheck_scan_quality['clipped_edges'])}) -- "
+            "part of the table is likely missing from the scan. Re-scan the document, or "
+            "re-run with allow_clipped=True (--allow-clipped on the CLI) to extract anyway."
+        )
 
     text, tables_text, method, ocr_time_seconds, scan_quality = extract_text(pdf_path, force_ocr=force_ocr)
     if not text:
@@ -74,6 +99,33 @@ async def run(
     detection = None
     if shipment_type == "auto":
         detection = detect_shipment_type(text)
+        # A native digital-text extraction landing on "unknown" is sometimes
+        # not genuinely ambiguous text -- it's a source PDF whose own
+        # embedded text layer has a defect (confirmed real case: a country
+        # name silently merged with a stray trailing character in the PDF's
+        # own content stream, breaking the word-boundary match that would
+        # otherwise have found it -- forcing this same file through OCR
+        # re-reads the rendered pixels fresh and produces the clean word,
+        # since OCR doesn't inherit whatever corrupted the source's text
+        # objects). Only worth retrying when the FIRST pass used the fast
+        # digital-text path (method == "2d_layout_canvas"): if it was
+        # already OCR'd and still came back unknown, forcing OCR again
+        # can't produce different text, so there's nothing to gain by
+        # spending another OCR pass. This only adds cost on the failure
+        # path that already has no usable result -- it can't change
+        # anything for a file that already detects cleanly on its first
+        # pass.
+        if detection.shipment_type == "unknown" and method == "2d_layout_canvas":
+            print("[info] shipment type unknown from digital text layer, retrying via forced OCR")
+            ocr_text, ocr_tables_text, ocr_method, ocr_time_seconds2, ocr_scan_quality = extract_text(
+                pdf_path, force_ocr=True,
+            )
+            ocr_detection = detect_shipment_type(ocr_text)
+            if ocr_detection.shipment_type != "unknown":
+                print(f"[info] forced-OCR retry resolved shipment type: {ocr_detection.shipment_type} (signal={ocr_detection.signal})")
+                text, tables_text, method, scan_quality = ocr_text, ocr_tables_text, ocr_method, ocr_scan_quality
+                ocr_time_seconds += ocr_time_seconds2
+                detection = ocr_detection
         if detection.shipment_type == "unknown":
             raise AmbiguousShipmentTypeError(
                 "Could not confidently determine whether this invoice is an "
@@ -231,6 +283,11 @@ def main():
                     help=f"Re-extraction attempts allowed after a validation failure "
                          f"(default: {MAX_REEXTRACTION_ATTEMPTS}, i.e. {MAX_REEXTRACTION_ATTEMPTS + 1} "
                          f"attempts total). Set to 0 to disable retries.")
+    ap.add_argument("--allow-clipped", action="store_true",
+                    help="Extract anyway even if the scan's table border touches the page "
+                         "edge (a row/column is likely physically missing from the scan). "
+                         "Without this flag, extraction refuses to run on a confirmed-clipped "
+                         "scan rather than spend an LLM call on data known to be incomplete.")
     args = ap.parse_args()
 
     out = args.out or (Path(args.pdf).stem + "_extracted.json")
@@ -238,7 +295,7 @@ def main():
         asyncio.run(run(
             args.pdf, args.model, out,
             shipment_type=args.type, template_path=args.template, force_ocr=args.force_ocr,
-            max_retries=args.max_retries,
+            max_retries=args.max_retries, allow_clipped=args.allow_clipped,
         ))
     except Exception as e:
         print(f"[error] {e}", file=sys.stderr)

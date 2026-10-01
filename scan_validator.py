@@ -136,22 +136,67 @@ def validate_scan(image, max_skew_deg=2.0, edge_margin_frac=0.005, min_len_frac=
     # a heading) is just noise. So: collect edge-touching endpoints per side,
     # de-duplicate points that belong to the same line fragment, and only
     # flag a side once several distinct borders end there.
+    #
+    # Two confirmed real false positives fixed here:
+    #
+    # 1. Orientation. A row border getting clipped at the left/right edge is
+    # a roughly HORIZONTAL line whose endpoint runs INTO that edge; a column
+    # border clipped at the top/bottom edge is a roughly VERTICAL line
+    # running into THAT edge. The original code never checked this, so a
+    # line running PARALLEL to the edge it touches -- e.g. a vertical
+    # decorative page border, or a scanner-bed-edge shadow, sitting right
+    # next to the left/right edge for most of the page's height -- was
+    # wrongly accepted as clipping evidence. Confirmed on three real,
+    # visually-unclipped invoices (455024201.pdf, Commercial Invoice
+    # 11.pdf, INV1_1.pdf): every line that triggered a false "clipped" verdict
+    # ran parallel to the edge it was checked against, not perpendicular
+    # into it.
+    #
+    # 2. Endpoint double-counting. A single line running ALONG an edge (the
+    # false-positive case above) has both its endpoints sitting near that
+    # edge, often far apart from each other since the line itself is long --
+    # the original code added both endpoints as separate "hits", so one
+    # line could look like two independent borders on its own. Fixed by
+    # collecting at most one point per line per edge (the midpoint of
+    # whichever endpoint(s) of that line touch it).
     margin_x = max(3, int(W * edge_margin_frac))
     margin_y = max(3, int(H * edge_margin_frac))
     MIN_INDEPENDENT_LINES = 3
     DEDUPE_GAP = 40  # px apart along the edge to count as a distinct border
+    MAX_PARALLEL_DEG = 20  # a line within this many degrees of running
+    # ALONG the edge (rather than into it) is excluded as decorative/
+    # artifact, not a clipped row/column border.
 
     hits_per_edge = {"left": [], "right": [], "top": [], "bottom": []}
     for (x1, y1, x2, y2, length, norm_ang, raw_ang) in cluster:
+        # abs(raw_ang) near 0 = horizontal line, near 90 = vertical line.
+        is_horizontal = abs(raw_ang) <= MAX_PARALLEL_DEG
+        is_vertical = abs(abs(raw_ang) - 90) <= MAX_PARALLEL_DEG
+
+        line_hits: dict[str, list[int]] = {}
         for (x, y) in ((x1, y1), (x2, y2)):
-            if x <= margin_x:
-                hits_per_edge["left"].append(y)
-            elif x >= W - margin_x:
-                hits_per_edge["right"].append(y)
-            if y <= margin_y:
-                hits_per_edge["top"].append(x)
-            elif y >= H - margin_y:
-                hits_per_edge["bottom"].append(x)
+            # left/right clipping evidence must be a horizontal line running
+            # INTO that edge -- a vertical line merely sitting near the edge
+            # (running along it) is excluded.
+            if is_horizontal:
+                if x <= margin_x:
+                    line_hits.setdefault("left", []).append(y)
+                elif x >= W - margin_x:
+                    line_hits.setdefault("right", []).append(y)
+            # top/bottom clipping evidence must be a vertical line running
+            # INTO that edge, symmetrically.
+            if is_vertical:
+                if y <= margin_y:
+                    line_hits.setdefault("top", []).append(x)
+                elif y >= H - margin_y:
+                    line_hits.setdefault("bottom", []).append(x)
+
+        # This one line contributes AT MOST one point per edge, even if
+        # both its endpoints touch that edge -- otherwise a single long
+        # line touching an edge at both ends would double-count as two
+        # independent borders.
+        for side, coords in line_hits.items():
+            hits_per_edge[side].append(sum(coords) / len(coords))
 
     edges_hit = set()
     for side, coords in hits_per_edge.items():

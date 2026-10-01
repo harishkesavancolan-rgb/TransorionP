@@ -1,0 +1,97 @@
+[
+  {
+    "file": "003160840373.INV.STR.HPS.CST.20260811.180620.20260812.011158.229981.pdf",
+    "status": "ok",
+    "shipment_type": "import",
+    "items": 3,
+    "warnings": 0,
+    "validation": "validated",
+    "elapsed": 85.5,
+    "cost_inr": 0.4425
+  },
+  {
+    "file": "20260728161255389.pdf",
+    "status": "ok",
+    "shipment_type": "import",
+    "items": 7,
+    "warnings": 1,
+    "validation": "validation_failed (9 errors)",
+    "elapsed": 213.7,
+    "cost_inr": 3.1871
+  },
+  {
+    "file": "455024201.pdf",
+    "status": "ok",
+    "shipment_type": "import",
+    "items": 29,
+    "warnings": 1,
+    "validation": "validated",
+    "elapsed": 453.0,
+    "cost_inr": 2.2819
+  },
+  {
+    "file": "6810995125_Commercial Invoice_1.pdf",
+    "status": "ok",
+    "shipment_type": "import",
+    "items": 5,
+    "warnings": 0,
+    "validation": "validated",
+    "elapsed": 122.6,
+    "cost_inr": 1.4673
+  },
+  {
+    "file": "Commercial Invoice 11.pdf",
+    "status": "ok",
+    "shipment_type": "import",
+    "items": 1,
+    "warnings": 1,
+    "validation": "validated",
+    "elapsed": 90.9,
+    "cost_inr": 0.4618
+  },
+  {
+    "file": "24299.pdf",
+    "status": "ok",
+    "shipment_type": "export",
+    "items": 10,
+    "warnings": 4,
+    "validation": "validation_failed (6 errors)",
+    "elapsed": 743.6,
+    "cost_inr": 5.9817
+  },
+  {
+    "file": "2710_001.pdf",
+    "status": "ok",
+    "shipment_type": "export",
+    "items": 0,
+    "warnings": 1,
+    "validation": "validated",
+    "elapsed": 101.6,
+    "cost_inr": 0.1781
+  },
+  {
+    "file": "2553936162.pdf",
+    "status": "FAILED: Error code: 429 - {'error': {'message': 'Rate limit reached for gpt-5-nano in organization org-MuuljhNmYFYiuNOajwsK92ht on tokens per min (TPM): Limit 200000, Used 200000, Requested 4074. Please try again in 1.222s. Visit https://platform.openai.com/account/rate-limits to learn more.', 'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}",
+    "elapsed": 695.7
+  },
+  {
+    "file": "INV10.pdf",
+    "status": "ok",
+    "shipment_type": "import",
+    "items": 2,
+    "warnings": 0,
+    "validation": "validated",
+    "elapsed": 86.1,
+    "cost_inr": 0.413
+  },
+  {
+    "file": "INV1_1.pdf",
+    "status": "ok",
+    "shipment_type": "import",
+    "items": 2,
+    "warnings": 1,
+    "validation": "validated",
+    "elapsed": 53.1,
+    "cost_inr": 0.2497
+  }
+]

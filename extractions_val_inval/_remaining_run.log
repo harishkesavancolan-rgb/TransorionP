@@ -1,0 +1,358 @@
+Failed to parse LLM JSON output. Raw snippet: 'Sorry, I can’t reliably extract the line items from the text you provided. The page text is highly garbled and corrupted, with many stray characters and no clearly identifiable, aligned table rows for items (no distinct SNo, description, part number, qty/price/amount columns, etc.). I can only produ'
+Validation failed on attempt 1 (1 error(s)) -- re-extracting (items only).
+Validation failed on attempt 1 (1 error(s)) -- re-extracting (header only).
+Validation failed on attempt 1 (25 error(s)) -- re-extracting (items only).
+[info] found 18 PDF(s) -- running 5 concurrently
+[1/18] starting  003160840373.INV.STR.HPS.CST.20260811.180620.20260812.011158.229981.pdf
+[info] extracted 6473 chars from D:\prashantproject\Pray\extractions_val_inval\_remaining_input\003160840373.INV.STR.HPS.CST.20260811.180620.20260812.011158.229981.pdf via 2d_layout_canvas
+[1/18] skipped   003160840373.INV.STR.HPS.CST.20260811.180620.20260812.011158.229981.pdf: ambiguous type -- re-run with --type export|import
+[2/18] starting  0715000217.pdf
+[info] extracted 2094 chars from D:\prashantproject\Pray\extractions_val_inval\_remaining_input\0715000217.pdf via ocr_rapidocr
+[info] OCR completed in 8.10s using ocr_rapidocr
+[info] detected shipment type: export (signal=keyword)
+[3/18] starting  1055044694.pdf
+[info] extracted 9870 chars from D:\prashantproject\Pray\extractions_val_inval\_remaining_input\1055044694.pdf via 2d_layout_canvas
+[info] detected shipment type: export (signal=keyword)
+[4/18] starting  20260728161255389.pdf
+[info] extracted 50667 chars from D:\prashantproject\Pray\extractions_val_inval\_remaining_input\20260728161255389.pdf via ocrmypdf_docker
+[info] OCR completed in 11.94s using ocrmypdf_docker
+[4/18] skipped   20260728161255389.pdf: ambiguous type -- re-run with --type export|import
+[5/18] starting  20262201728 I.pdf
+[info] extracted 59743 chars from D:\prashantproject\Pray\extractions_val_inval\_remaining_input\20262201728 I.pdf via 2d_layout_canvas
+[info] detected shipment type: export (signal=both)
+[6/18] starting  24299.pdf
+[info] extracted 160471 chars from D:\prashantproject\Pray\extractions_val_inval\_remaining_input\24299.pdf via ocrmypdf_docker
+[info] OCR completed in 27.30s using ocrmypdf_docker
+[6/18] skipped   24299.pdf: ambiguous type -- re-run with --type export|import
+[7/18] starting  2553936162.pdf
+[info] extracted 528803 chars from D:\prashantproject\Pray\extractions_val_inval\_remaining_input\2553936162.pdf via ocrmypdf_docker
+[info] OCR completed in 71.91s using ocrmypdf_docker
+[info] detected shipment type: import (signal=structural)
+[8/18] starting  2710_001.pdf
+[info] extracted 17680 chars from D:\prashantproject\Pray\extractions_val_inval\_remaining_input\2710_001.pdf via ocrmypdf_docker
+[info] OCR completed in 16.00s using ocrmypdf_docker
+[8/18] skipped   2710_001.pdf: ambiguous type -- re-run with --type export|import
+[9/18] starting  455024201.pdf
+[info] extracted 6881 chars from D:\prashantproject\Pray\extractions_val_inval\_remaining_input\455024201.pdf via 2d_layout_canvas
+[9/18] skipped   455024201.pdf: ambiguous type -- re-run with --type export|import
+[10/18] starting  6059-FWD INV.pdf
+[info] extracted 5967 chars from D:\prashantproject\Pray\extractions_val_inval\_remaining_input\6059-FWD INV.pdf via 2d_layout_canvas
+[info] detected shipment type: export (signal=structural)
+[7/18] FAILED    2553936162.pdf: Expecting value: line 1 column 1 (char 0)
+[11/18] starting  6810995125_Commercial Invoice_1.pdf
+[info] extracted 15571 chars from D:\prashantproject\Pray\extractions_val_inval\_remaining_input\6810995125_Commercial Invoice_1.pdf via 2d_layout_canvas
+[11/18] skipped   6810995125_Commercial Invoice_1.pdf: ambiguous type -- re-run with --type export|import
+[12/18] starting  CI 9010177886.pdf
+[info] extracted 4426 chars from D:\prashantproject\Pray\extractions_val_inval\_remaining_input\CI 9010177886.pdf via 2d_layout_canvas
+[info] detected shipment type: export (signal=structural)
+[info] validation passed on attempt 1/3
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\valid\0715000217.json
+
+--- HEADER SUMMARY ---
+Invoice No : EXPU2/2627/0612  |  Date: 2026-07-16
+Supplier   : GLASTRONIX LLP
+Buyer      : LAMRESEARCHMANUFACTURINGKOREA LLC
+Consignee  : LAMRESEARCHMFGKOREALLC
+Total      : 4620 USD
+Terms      : NET 60 DAYS
+
+--- ITEM (1 items) ---
+  #35 | TOP.SHLD.CLG                        | Part: 839-240165-021-REV-A-ASSY | Order: EXPU2/2627/0612 | Qty: 132 NOS | Rate: 35.0 | Total: 4620.0
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : ocr_rapidocr
+OCR Execution Time       : 8.10s
+Total Extraction Time    : 308.33s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 4,583
+Cached Input Tokens      : 2,432
+Output Tokens            : 11,471
+Total Tokens             : 18,486
+Cost (USD)               : $0.004830
+Cost (INR)               : INR 0.4105
+[2/18] done      0715000217.pdf  (1 items, 0 warnings, 308.3s)
+[13/18] starting  Commercial Invoice 11.pdf
+[info] extracted 4567 chars from D:\prashantproject\Pray\extractions_val_inval\_remaining_input\Commercial Invoice 11.pdf via ocrmypdf_docker
+[info] OCR completed in 6.37s using ocrmypdf_docker
+[13/18] skipped   Commercial Invoice 11.pdf: ambiguous type -- re-run with --type export|import
+[14/18] starting  INV - RGP-005 -V1.pdf
+[info] extracted 4657 chars from D:\prashantproject\Pray\extractions_val_inval\_remaining_input\INV - RGP-005 -V1.pdf via 2d_layout_canvas
+[info] detected shipment type: export (signal=structural)
+[info] validation passed on attempt 2/3
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\valid\1055044694.json
+
+--- HEADER SUMMARY ---
+Invoice No : 1055044694  |  Date: 2026-08-21
+Supplier   : Nokia Solutions and Networks India Private Limited
+Buyer      : NOKIA SOLUTIONS  AND  NETWORKS OY
+Consignee  : Nokia Solutions and Networks Oy Tilburg HUB
+Total      : 72620.93 USD
+Terms      : 60 days net
+
+--- ITEM (1 items) ---
+  #1  | ARGA AirScale RFM 6T6R B1 480 W     | Part: 474800A.102  | Order: 0051991481   | Qty: 49 PCS | Rate: 1255.98 | Total: 61543.02
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : 2d_layout_canvas
+Total Extraction Time    : 315.68s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 8,432
+Cached Input Tokens      : 4,864
+Output Tokens            : 14,386
+Total Tokens             : 27,682
+Cost (USD)               : $0.006200
+Cost (INR)               : INR 0.5270
+[3/18] done      1055044694.pdf  (1 items, 0 warnings, 315.7s)
+[15/18] starting  INV10.pdf
+[info] extracted 4056 chars from D:\prashantproject\Pray\extractions_val_inval\_remaining_input\INV10.pdf via 2d_layout_canvas
+[15/18] skipped   INV10.pdf: ambiguous type -- re-run with --type export|import
+[16/18] starting  INV1_1.pdf
+[info] extracted 2709 chars from D:\prashantproject\Pray\extractions_val_inval\_remaining_input\INV1_1.pdf via 2d_layout_canvas
+[16/18] skipped   INV1_1.pdf: ambiguous type -- re-run with --type export|import
+[17/18] starting  INVOICE (1).pdf
+[info] extracted 16582 chars from D:\prashantproject\Pray\extractions_val_inval\_remaining_input\INVOICE (1).pdf via ocrmypdf_docker
+[info] OCR completed in 7.19s using ocrmypdf_docker
+[info] detected shipment type: import (signal=structural)
+[info] validation passed on attempt 1/3
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\valid\CI 9010177886.json
+
+--- HEADER SUMMARY ---
+Invoice No : 9010177886  |  Date: 2026-07-30
+Supplier   : Outdoor Wireless Networks LLC
+Buyer      : COMUNICACIONES CELULARES SA
+Consignee  : COMUNICACIONES CELULARES SA
+Total      : 159000 USD
+Terms      : NET 60 DAYS
+
+--- ITEM (1 items) ---
+  #1  | 4SS-15B-R4B ANT  - 16HB, 15DEG, 4RE | Part: 000010       | Order: 89843        | Qty: 30 EA | Rate: 5300.0 | Total: 159000.0
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : 2d_layout_canvas
+Total Extraction Time    : 73.42s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 1,619
+Cached Input Tokens      : 5,248
+Output Tokens            : 9,036
+Total Tokens             : 15,903
+Cost (USD)               : $0.003722
+Cost (INR)               : INR 0.3163
+[12/18] done      CI 9010177886.pdf  (1 items, 0 warnings, 73.4s)
+[18/18] starting  Reroute_CCU50_135177_1704331020_IN66383065 _CI.pdf
+[info] extracted 10367 chars from D:\prashantproject\Pray\extractions_val_inval\_remaining_input\Reroute_CCU50_135177_1704331020_IN66383065 _CI.pdf via 2d_layout_canvas
+[info] detected shipment type: import (signal=structural)
+[info] validation passed on attempt 2/3
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\valid\6059-FWD INV.jsonValidation failed on attempt 1 (1 error(s)) -- re-extracting (items only).
+Validation failed on attempt 2 (38 error(s)) -- re-extracting (items only).
+
+
+--- HEADER SUMMARY ---
+Invoice No : 6059-FWD  |  Date: 2026-07-03
+Supplier   : HABEEB TANNING COMPANY
+Buyer      : LOUIS STEITZ SECURA GMBH + CO. KG.
+Consignee  : LOUIS STEITZ SECURA GMBH + CO. KG.
+Total      : 58379.4 EUR
+Terms      : 100% ADVANCE BY T.T. REMITTANCE
+
+--- ITEM (8 items) ---
+  #1  | Shoe Uppers                         | Part: VD 1000 U    | Order: 2604-619     | Qty: 600 PAIRS | Rate: 11.95 | Total: 7170.0
+  #2  | Shoe Uppers                         | Part: VD 1010 U    | Order: 2604-622     | Qty: 400 PAIRS | Rate: 13.88 | Total: 5552.0
+  #3  | Shoe Uppers                         | Part: VD 1500 U    | Order: 2604-648     | Qty: 600 PAIRS | Rate: 15.09 | Total: 9054.0
+  #4  | Shoe Uppers                         | Part: VD 1510 SMC U | Order: 2604-649     | Qty: 400 PAIRS | Rate: 22.15 | Total: 8860.0
+  #5  | Shoe Uppers                         | Part: VD 1540 U    | Order: 2604-650     | Qty: 200 PAIRS | Rate: 15.39 | Total: 3078.0
+  #6  | Shoe Uppers                         | Part: VD 1000 U    | Order: 2606-666     | Qty: 2000 PAIRS | Rate: 11.95 | Total: 23900.0
+  #7  | Shoe Uppers                         | Part: VD 1510 BOA U | Order: 91.214       | Qty: 17 PAIRS | Rate: 24.54 | Total: 417.18
+  #8  | Shoe Uppers                         | Part: VD 1810 BOA U | Order: 91.214       | Qty: 17 PAIRS | Rate: 29.09 | Total: 494.53
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : 2d_layout_canvas
+Total Extraction Time    : 160.50s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 5,946
+Cached Input Tokens      : 8,064
+Output Tokens            : 18,827
+Total Tokens             : 32,837
+Cost (USD)               : $0.007868
+Cost (INR)               : INR 0.6688
+[10/18] done      6059-FWD INV.pdf  (8 items, 0 warnings, 160.5s)
+[info] validation passed on attempt 1/3
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\valid\INVOICE (1).json
+
+--- HEADER SUMMARY ---
+Invoice No : KMT2.20260817455 / KMT2.20260817-455  |  Date: 2026-08-17 / 2026-08-17
+Supplier   : FIRST SOLAR MALAYSIA SDN. BHD.
+Buyer      : FS India Solar Ventures Private Limited
+Consignee  : S India Solar Ventures Private Limited
+Total      : 508.68 USD
+
+--- BOE (1 items) ---
+  #1  | GUIDE BLOCK, LH                     | Part: 60028597     | Order: TO# 2138449  | Qty: 2 PCS | Rate: 254.34 | Total: 
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : ocrmypdf_docker
+OCR Execution Time       : 7.19s
+Total Extraction Time    : 83.37s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 5,551
+Cached Input Tokens      : 5,248
+Output Tokens            : 10,565
+Total Tokens             : 21,364
+Cost (USD)               : $0.004530
+Cost (INR)               : INR 0.3850
+[17/18] done      INVOICE (1).pdf  (1 items, 0 warnings, 83.4s)
+[info] validation passed on attempt 1/3
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\valid\Reroute_CCU50_135177_1704331020_IN66383065 _CI.json
+
+--- HEADER SUMMARY ---
+Invoice No : 135177  |  Date: 2026-08-24
+Supplier   : HYVE Solutions Europe Limited
+Buyer      : Amazon Data Services India Private Limited
+Consignee  : STT Global Data Centres India Private Limited
+Total      : 151916.6 USD
+Terms      : 35 DAYS
+
+--- BOE (1 items) ---
+  #1  | RACK_WMW_42RU_FINALCAT1.0,(Network  | Part: 1704331020   | Order: IN66383065   | Qty: 1 NOS | Rate: 151916.6 | Total: 
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : 2d_layout_canvas
+Total Extraction Time    : 80.90s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 2,289
+Cached Input Tokens      : 5,248
+Output Tokens            : 11,630
+Total Tokens             : 19,167
+Cost (USD)               : $0.004793
+Cost (INR)               : INR 0.4074
+[18/18] done      Reroute_CCU50_135177_1704331020_IN66383065 _CI.pdf  (1 items, 0 warnings, 80.9s)
+[info] validation passed on attempt 2/3
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\valid\INV - RGP-005 -V1.json
+
+--- HEADER SUMMARY ---
+Invoice No : RGP-005 / 2026-27  |  Date: 2026-07-10
+Supplier   : ASUX  Safety Components India Pvt.Ltd.
+Buyer      : STRADVISION
+Consignee  : STRADVISION
+Total      : 5259.65 USD
+
+--- ITEM (1 items) ---
+  #01-01 | HDD                                 | Part:              | Order:              | Qty: 100 PCS | Rate: 52.6 | Total: 5260.0
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : 2d_layout_canvas
+Total Extraction Time    : 111.47s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 4,767
+Cached Input Tokens      : 5,504
+Output Tokens            : 13,333
+Total Tokens             : 23,604
+Cost (USD)               : $0.005599
+Cost (INR)               : INR 0.4759
+[14/18] done      INV - RGP-005 -V1.pdf  (1 items, 0 warnings, 111.5s)
+[warn] validation FAILED after 3/3 attempt(s): 34 unresolved error(s)
+[warn]   [REQUIRED_FIELD_MISSING] Item 1: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 2: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 3: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 4: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 5: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 6: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 7: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 8: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 9: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 10: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 11: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 16: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 17: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 18: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 19: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 20: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 21: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 22: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 23: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 24: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 25: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 26: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 27: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 28: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 29: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 30: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 31: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 32: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 33: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 34: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 35: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 36: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 37: required field 'Item_Unit1' (unit) is missing.
+[warn]   [REQUIRED_FIELD_MISSING] Item 38: required field 'Item_Unit1' (unit) is missing.
+[info] wrote D:\prashantproject\Pray\extractions_val_inval\validation_failed\20262201728 I.json
+
+--- HEADER SUMMARY ---
+Invoice No : 20262201728  |  Date: 2026-07-29
+Supplier   : Flowserve India Controls Pvt Ltd
+Buyer      : FLOWSERVE ABAHSAIN FLOW CONTROL CO.
+Consignee  : FLOWSERVE ABAHSAIN FLOW CONTROL CO. LIMITED
+Total      : 2801.17 USD
+
+--- ITEM (38 items) ---
+  #1  | PARTS OF CONTROL VALVE (HSS CODE :  | Part: 001044.825.0 | Order: 4554851 (29-JUL-26) | Qty: 1  | Rate: 11.39 | Total: 11.39
+  #2  | PARTS OF CONTROL VALVE (HSS CODE :  | Part: 001147.927.0 | Order: 4555225 (29-JUL-26) | Qty: 2  | Rate: 0.34 | Total: 0.68
+  #3  | GUIDE LINER, 2.00 STEM, PTFE, Plast | Part: 057362.927.0 | Order:              | Qty: 1  | Rate: 1.14 | Total: 1.14
+  #4  | PACKING, VEE, 0.56 STEM, ECO 15548, | Part: 001147.925.0 | Order:              | Qty: 2  | Rate: 0.34 | Total: 0.68
+  #5  | PACKING, FEMALE, 0.56 STEM, ECO 155 | Part: 001149.925.0 | Order:              | Qty: 2  | Rate: 0.35 | Total: 0.7
+  #6  | O-RING, DASH #459, Rubber, Viton A, | Part: 001716.651.0 | Order:              | Qty: 1  | Rate: 10.23 | Total: 10.23
+  #7  | PACKING, MALE, 1.50 STEM, ECO 15547 | Part: 001965.C3A.0 | Order:              | Qty: 6  | Rate: 0.66 | Total: 3.96
+  #8  | PACKING, FEMALE, 1.50 STEM, ECO 155 | Part: 001966.C3A.0 | Order:              | Qty: 6  | Rate: 0.61 | Total: 3.66
+  #9  | BUSHING, 1.88 OD, 1.50 ID, 0.88 L,  | Part: 017719.431.0 | Order:              | Qty: 1  | Rate: 9.83 | Total: 9.83
+  #10 | GASKET, PTFE, 9.25 X 8.75, 0.15 THI | Part: 026598.925.0 | Order:              | Qty: 2  | Rate: 4.99 | Total: 9.98
+  #11 | PACKING, MALE, 1.00 STEM, 1.50 OD,  | Part: 054486.925.0 | Order:              | Qty: 1  | Rate: 0.88 | Total: 0.88
+  #12 | PACKING, FEMALE, 1.00 STEM, 1.50 OD | Part: 054487.925.0 | Order:              | Qty: 1 NOS | Rate: 0.5 | Total: 0.5
+  #13 | PACKING, VEE, 1.00 STEM, 1.50 OD, E | Part: 054488.925.0 | Order:              | Qty: 4 NOS | Rate: 0.64 | Total: 2.56
+  #14 | PACKING, FEMALE, MAXFLO, 1.50/2", 0 | Part: 121172.925.0 | Order:              | Qty: 8 NOS | Rate: 0.95 | Total: 7.6
+  #15 | PACKING, VEE, MAXFLO, 1.50/2", 0.08 | Part: 121173.925.0 | Order:              | Qty: 24 NOS | Rate: 0.67 | Total: 16.08
+  #16 | PACKING, MALE, MAXFLO, 1.50/2", 0.0 | Part: 121174.925.0 | Order:              | Qty: 8  | Rate: 0.66 | Total: 5.28
+  #17 | PACKING, FEMALE, MAXFLO, 3"/4", Pla | Part: 121175.925.0 | Order:              | Qty: 1  | Rate: 0.6 | Total: 0.6
+  #18 | PACKING, VEE, MAXFLO, 3"/4", Plasti | Part: 121176.925.0 | Order:              | Qty: 3  | Rate: 0.7 | Total: 2.1
+  #19 | PACKING, MALE, MAXFLO, 3"/4", ECO 1 | Part: 121177.925.0 | Order:              | Qty: 1  | Rate: 0.66 | Total: 0.66
+  #20 | DWGREV: 00;GUIDE, CHNLSTRM, EXTD, P | Part: 066568.150.0 | Order:              | Qty: 1  | Rate: 4.69 | Total: 4.69
+  #21 | GASKET, MAXFLO 4/3, 36.75MM X 28.15 | Part: 184335.925.0 | Order:              | Qty: 8  | Rate: 0.22 | Total: 1.76
+  #22 | GASKET, MAXFLO 4/3, 23.75MM X 18.75 | Part: 184341.925.0 | Order:              | Qty: 8  | Rate: 0.15 | Total: 1.2
+  #23 | FLANGE, GLAND, MAXFLO 4/3, 3"/4", C | Part: 184158.211.0 | Order:              | Qty: 1  | Rate: 4.1 | Total: 4.1
+  #24 | LIFTING HOIST, SWIVEL, CARR LANE, 7 | Part: 252468.999.0 | Order:              | Qty: 10  | Rate: 235.41 | Total: 2354.1
+  #25 | PLATE, FLOW INDICATOR, MAXFLO 4/3,  | Part: 184333.150.0 | Order:              | Qty: 9  | Rate: 0.38 | Total: 3.42
+  #26 | NUT, M5X0.8, 316 Stainless Steel (U | Part: 026974.150.0 | Order:              | Qty: 16  | Rate: 0.04 | Total: 0.64
+  #27 | NUT, M6X1, HEX, STYLE 1, 316 Stainl | Part: 104076.150.0 | Order:              | Qty: 26  | Rate: 0.04 | Total: 1.04
+  #28 | WASHER, FLAT, M5, NARROW, ECN 40643 | Part: 183136.150.0 | Order:              | Qty: 46  | Rate: 0.06 | Total: 2.76
+  #29 | STUD, M20X2.5, 75MM L, A or SA-193- | Part: 266944.012.0 | Order:              | Qty: 4  | Rate: 1.41 | Total: 5.64
+  #30 | O-RING, ......................, DAS | Part: 041064.CNK.000 | Order:              | Qty: 8  | Rate: 0.95 | Total: 7.6
+  #31 | BALL JOINT, SWIVEL, T.E.A. MACHINE  | Part: 314422.999.0 | Order:              | Qty: 9  | Rate: 6.88 | Total: 61.92
+  #32 | BALL JOINT, SWIVEL, T.E.A. MACHINE  | Part: 314423.999.0 | Order:              | Qty: 9  | Rate: 6.95 | Total: 62.55
+  #33 | FILTER, AIR, ROSS, 5X00B2104A COALE | Part: 396149.999.0 | Order:              | Qty: 2  | Rate: 84.26 | Total: 168.52
+  #34 | STEM CLAMP, CAP, TWO PIECE, G2, SIZ | Part: 396446.211.0 | Order:              | Qty: 4  | Rate: 1.89 | Total: 7.56
+  #35 | STEM CLAMP, TWO PIECE, G2, SIZE 25, | Part: 396447.211.0 | Order:              | Qty: 4  | Rate: 2.64 | Total: 10.56
+  #36 | SNAP RING, XRO 439, 17-7 PH Stainle | Part: 601601.JSQ.0 | Order:              | Qty: 1  | Rate: 6.59 | Total: 6.59
+  #37 | LOCKNUT, #10-32, ESNA F22NTM-02, NY | Part: 123906.150.0 | Order:              | Qty: 1  | Rate: 0.82 | Total: 0.82
+  #38 | GASKET, SPIRAL, 10.16 X 9.62 X 0.12 | Part: 396324.LE9.0 | Order:              | Qty: 1  | Rate: 7.19 | Total: 7.19
+
+--- PERFORMANCE SUMMARY ---
+Extraction Method        : 2d_layout_canvas
+Total Extraction Time    : 484.32s
+
+--- TOKEN USAGE & COST ---
+Input Tokens             : 60,506
+Cached Input Tokens      : 80,256
+Output Tokens            : 246,017
+Total Tokens             : 386,779
+Cost (USD)               : $0.101833
+Cost (INR)               : INR 8.6558
+[warn] 2 warning(s) -- see output file for details
+[5/18] done      20262201728 I.pdf  (38 items, 2 warnings, 484.3s)
+
+[done] 8/18 succeeded, 1 failed, 9 skipped in 519.2s -- total cost Rs.11.85
+[info] wrote summary -> D:\prashantproject\Pray\extractions_val_inval\_summary.csv

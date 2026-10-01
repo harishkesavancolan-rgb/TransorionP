@@ -72,6 +72,47 @@ def test_total_packages_ignores_pallet_count():
     assert header["total_packages"] == 3840
 
 
+# ── country_of_origin: export-only origin/destination swap fix ──────────
+
+def _swapped_origin_header(supplier_address):
+    return {
+        "supplier_address": supplier_address,
+        "country_of_origin": "GERMANY", "country_of_destination": "GERMANY",
+    }
+
+
+def test_export_origin_equal_to_destination_is_corrected_to_india():
+    header = _swapped_origin_header("Plot 4, MIDC, Pune 411019, Maharashtra, India")
+    llm_extract.apply_header_guardrails(header, [], "", shipment_type="export")
+    assert header["country_of_origin"] == "IN"
+
+
+def test_import_origin_is_never_rewritten_even_if_supplier_mentions_india():
+    # Import destination is always India, so the "dest == IN" swap case
+    # would fire on every import whose supplier address names India.
+    header = {
+        "supplier_address": "Shenzhen, China (India liaison office: Bengaluru, India)",
+        "country_of_origin": "CHINA", "country_of_destination": "INDIA",
+    }
+    llm_extract.apply_header_guardrails(header, [], "", shipment_type="import")
+    assert header["country_of_origin"] == "CHINA"
+
+
+def test_supplier_in_indiana_is_not_treated_as_indian():
+    header = {
+        "supplier_address": "500 Main St, Indianapolis, Indiana 46204, USA",
+        "country_of_origin": "USA", "country_of_destination": "INDIA",
+    }
+    llm_extract.apply_header_guardrails(header, [], "", shipment_type="export")
+    assert header["country_of_origin"] == "USA"
+
+
+def test_country_guardrail_skipped_when_shipment_type_not_given():
+    header = _swapped_origin_header("Plot 4, MIDC, Pune 411019, Maharashtra, India")
+    llm_extract.apply_header_guardrails(header, [], "")
+    assert header["country_of_origin"] == "GERMANY"
+
+
 def test_apply_header_guardrails_is_a_noop_on_a_non_dict_header():
     # Defensive: a malformed LLM response (header came back as something
     # other than a dict) must not raise.
@@ -133,13 +174,21 @@ def test_chunked_extraction_below_threshold_makes_a_single_call(monkeypatch):
 
 
 def test_chunked_extraction_above_threshold_splits_and_merges_per_page(monkeypatch):
+    import re
+
     calls = []
 
     async def fake_extract_line_items(text, **kwargs):
         calls.append(text)
-        # Return one item per call, tagged by which page text it saw.
-        page_num = text.split("PAGE ")[1].split(" ")[0]
-        return [{"item_ser_no": int(page_num), "product_description": f"item from page {page_num}"}], dict(_USAGE)
+        # A chunk may cover _LINE_ITEMS_PAGES_PER_CHUNK pages at once --
+        # return one item per page marker actually present in this call's
+        # text, not one item per call, so merging across chunks is what
+        # gets tested here (chunk boundaries, not per-page granularity).
+        page_nums = [int(n) for n in re.findall(r"PAGE (\d+) OF", text)]
+        return (
+            [{"item_ser_no": n, "product_description": f"item from page {n}"} for n in page_nums],
+            dict(_USAGE),
+        )
 
     monkeypatch.setattr(llm_extract, "extract_line_items", fake_extract_line_items)
 
@@ -148,11 +197,12 @@ def test_chunked_extraction_above_threshold_splits_and_merges_per_page(monkeypat
 
     items, usage = asyncio.run(llm_extract.extract_line_items_chunked(text, model="gpt-5-nano"))
 
-    assert len(calls) == n_pages  # one call per page, not one call for the whole doc
-    assert [it["item_ser_no"] for it in items] == [1, 2, 3, 4, 5]  # merged in page order
-    # Usage summed across all per-page calls, not just the last one.
-    assert usage["input_tokens"] == _USAGE["input_tokens"] * n_pages
-    assert usage["output_tokens"] == _USAGE["output_tokens"] * n_pages
+    expected_n_chunks = -(-n_pages // llm_extract._LINE_ITEMS_PAGES_PER_CHUNK)  # ceil division
+    assert len(calls) == expected_n_chunks  # grouped into chunks, not one call per page
+    assert [it["item_ser_no"] for it in items] == [1, 2, 3, 4, 5]  # still merged in page order
+    # Usage summed across all chunk calls, not just the last one.
+    assert usage["input_tokens"] == _USAGE["input_tokens"] * expected_n_chunks
+    assert usage["output_tokens"] == _USAGE["output_tokens"] * expected_n_chunks
 
 
 def test_chunked_extraction_passes_feedback_to_every_chunk(monkeypatch):
@@ -168,4 +218,17 @@ def test_chunked_extraction_passes_feedback_to_every_chunk(monkeypatch):
     text = "".join(_page_marker(i, n_pages) + f"content {i}\n" for i in range(1, n_pages + 1))
     asyncio.run(llm_extract.extract_line_items_chunked(text, model="gpt-5-nano", feedback="fix the totals"))
 
-    assert seen_feedback == ["fix the totals"] * n_pages
+    expected_n_chunks = -(-n_pages // llm_extract._LINE_ITEMS_PAGES_PER_CHUNK)  # ceil division
+    assert seen_feedback == ["fix the totals"] * expected_n_chunks
+
+
+# ── _group_pages_into_chunks ──────────────────────────────────────────────
+
+def test_group_pages_into_chunks_groups_by_size():
+    pages = ["p1", "p2", "p3", "p4", "p5"]
+    assert llm_extract._group_pages_into_chunks(pages, 2) == ["p1\n\np2", "p3\n\np4", "p5"]
+
+
+def test_group_pages_into_chunks_size_one_is_noop():
+    pages = ["p1", "p2", "p3"]
+    assert llm_extract._group_pages_into_chunks(pages, 1) is pages
