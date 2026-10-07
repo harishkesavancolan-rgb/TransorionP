@@ -11,7 +11,8 @@ Pipeline, in order:
    country codes, currency-formatted numbers, RoDTEP Y/N).
 2. `_clean_generic_item()` — per line item: drops subtotal/deduction rows,
    coerces qty/price/total to numbers, cross-checks qty*price against the
-   printed total, resolves part_number/model_or_type from whichever
+   printed total (warning only -- a missing total is never computed),
+   resolves part_number/model_or_type from whichever
    alternate key the LLM used, and untangles FTA-code vs EU-end-use-code
    vs AD-code (a bank code, not a tariff code, despite the name).
 3. `_map_export_item()` / `_map_import_item()` — the ONLY two places that
@@ -82,8 +83,11 @@ def _coerce_number(value: Any) -> float | int | None:
 
 # Standard 15-char Indian GSTIN shape: 2-digit state code, 10-char PAN
 # (5 letters + 4 digits + 1 letter), 1 entity code, literal 'Z', 1
-# alphanumeric checksum.
-_GSTIN_RE = re.compile(r'^\d{2}[A-Z]{5}\d{4}[A-Z]\d Z[A-Z0-9]$'.replace(' ', ''))
+# alphanumeric checksum. The entity code is the PAN holder's registration
+# number within the state: a digit for the first nine, then a LETTER --
+# so it's [0-9A-Z], not \d (a digits-only class rejected real GSTINs of
+# entities with 10+ registrations in one state).
+_GSTIN_RE = re.compile(r'^\d{2}[A-Z]{5}\d{4}[A-Z][0-9A-Z]Z[A-Z0-9]$')
 
 # AD (Authorised Dealer) Code: always 14 digits (confirmed real value:
 # "6550002-2900009", 7+7). The hyphen is a cosmetic separator, not part of
@@ -154,6 +158,37 @@ def _repair_ad_code(val: str) -> str:
     return v
 
 
+# Currency names/symbols that appear on invoices instead of the ISO code
+# the validator (and the customs template) expect. Only UNAMBIGUOUS ones:
+# "$" and "¥" are deliberately absent -- each is shared by several
+# currencies (USD/CAD/AUD, JPY/CNY), so guessing would be inventing data.
+_CURRENCY_ALIASES = {
+    "EURO": "EUR", "EUROS": "EUR", "€": "EUR",
+    "US$": "USD", "USD$": "USD", "US DOLLAR": "USD", "US DOLLARS": "USD",
+    "UNITED STATES DOLLAR": "USD", "UNITED STATES DOLLARS": "USD",
+    "RS": "INR", "RUPEE": "INR", "RUPEES": "INR",
+    "INDIAN RUPEE": "INR", "INDIAN RUPEES": "INR", "₹": "INR",
+    "£": "GBP", "POUND STERLING": "GBP", "POUNDS STERLING": "GBP",
+    "YEN": "JPY", "RMB": "CNY", "RENMINBI": "CNY", "YUAN": "CNY",
+}
+
+
+def _normalize_currency(val: Any) -> str:
+    """Maps a printed currency name/symbol to its ISO code ("EURO" ->
+    "EUR"); a 3-letter code is just upper-cased; anything else is returned
+    stripped but otherwise untouched, so the validator can still flag it.
+    Without this, "EURO" failed the validator's FORMAT_TYPE check, which is
+    retryable -- burning a full re-extraction (doubling that file's tokens)
+    and, on one real file, getting the currency blanked by the retry."""
+    s = str(val).strip()
+    key = re.sub(r"\s+", " ", s.replace(".", "")).upper()
+    if key in _CURRENCY_ALIASES:
+        return _CURRENCY_ALIASES[key]
+    if re.fullmatch(r"[A-Za-z]{3}", s):
+        return s.upper()
+    return s
+
+
 _HEADER_FIELDS = [
     "invoice_number", "invoice_date", "supplier_name", "supplier_address",
     "supplier_tax_id", "buyer_name", "buyer_address", "consignee_name",
@@ -214,8 +249,17 @@ def _clean_invoice_header(
             # several wrong-looking values. Only overrides on a clear
             # mismatch or a missing value -- never touches an
             # already-matching state_code.
+            #
+            # Only trusted when supplier_tax_id passed the FULL GSTIN shape
+            # check, not merely when it starts with two digits: this field
+            # also gets IECs, VAT numbers and plain mis-reads, and any of
+            # those happening to start with digits used to stomp a correct
+            # state_code (e.g. IEC "0388012345" overwrote a correct
+            # "MH(27)" with "03"). _repair_gstin leaves a non-matching value
+            # unchanged (and warns), so the shape check here is what keeps a
+            # malformed value from being used as a source of truth.
             gstin_val = str(clean.get("supplier_tax_id") or "") if is_export else ""
-            if len(gstin_val) >= 2 and gstin_val[:2].isdigit():
+            if _GSTIN_RE.match(gstin_val):
                 gstin_state = gstin_val[:2]
                 if not val or val.strip().zfill(2) != gstin_state:
                     if val and val.strip().zfill(2) != gstin_state:
@@ -224,6 +268,8 @@ def _clean_invoice_header(
                             f"prefix '{gstin_state}' -- used the GSTIN's instead"
                         )
                     val = gstin_state
+        elif k == "currency" and val:
+            val = _normalize_currency(val)
         elif k in ("country_of_origin", "country_of_destination") and val:
             val_str = str(val).strip().upper()
             if val_str in ("INDIA", "IND"):
@@ -277,7 +323,29 @@ def _clean_generic_item(
     total = _coerce_number(item_vals.get("line_total"))
     packages = _coerce_number(item_vals.get("packages"))
 
-    # Mathematical verification: Qty * Price ≈ Line Total
+    # A row with NO quantity, NO unit price and NO amount carries nothing a
+    # customs row needs -- it's a stray fragment (confirmed real case: a
+    # page-by-page extraction returned one extra such row on both a 28-row
+    # and a 45-row invoice, which then failed REQUIRED_FIELD_MISSING and sank
+    # an otherwise complete, correctly-summing item list). Dropped with a
+    # warning rather than kept as a row that can only ever fail validation.
+    # If it was a real row whose numbers were all missed, the line amounts
+    # fall short of the printed total and LINE_ITEMS_INCOMPLETE flags that.
+    if qty is None and price is None and total is None:
+        warnings.append(
+            f"[line_items][row {row_idx+1}] discarded a row with no quantity, unit price or amount "
+            f"('{str(item_vals.get('product_description', ''))[:40]}')"
+        )
+        return None
+
+    # Mathematical verification: Qty * Price ≈ Line Total. Only ever WARNS
+    # -- line_total is never filled in or changed here. It used to be set
+    # to qty*price whenever it was missing OR a printed 0 (`not total` is
+    # True for 0), which invented an amount the invoice never stated, turned
+    # free-of-cost lines (printed amount 0) into chargeable ones, and made
+    # invoice_validator's QTY_X_UNIT_PRICE pass trivially against a number
+    # derived from the very values it was meant to check. A missing amount
+    # now stays "" and that check reports NOT_CHECKED instead.
     if isinstance(qty, (int, float)) and isinstance(price, (int, float)) and qty > 0 and price > 0:
         calc_total = round(qty * price, 2)
         if isinstance(total, (int, float)) and total > 0:
@@ -287,8 +355,11 @@ def _clean_generic_item(
                     f"[line_items][row {ser_no}] math discrepancy: "
                     f"Qty({qty}) * Price({price}) = {calc_total} != Line Total({total})"
                 )
-        elif not total:
-            total = calc_total
+        elif isinstance(total, (int, float)) and total == 0:
+            warnings.append(
+                f"[line_items][row {ser_no}] line total printed as 0 although "
+                f"Qty({qty}) * Price({price}) = {calc_total} -- kept as 0 (free of cost?)"
+            )
 
     # Disambiguate FTA Code vs AD Code vs EU end-use code
     fta = item_vals.get("fta_code")
@@ -559,22 +630,155 @@ def _drop_packing_list_duplicates(
     one with unit_price=560.0, the other with unit_price/line_total both
     empty). Drop the priceless duplicate rather than keep a phantom row.
     """
-    priced_keys = {
-        (it.get("part_number"), it.get("quantity"))
-        for it in items
-        if it.get("part_number") and it.get("unit_price") not in (None, "")
-    }
+    # A repeat is matched by part number when the row has one, else by
+    # description (confirmed real case: an invoice with NO part-number
+    # column, whose packing list repeated "OMEPRAZOLE GR PELLETS 13.4% M/M,
+    # 475 KG" with no price -- the part-number-only match never fired, and
+    # the phantom row failed validation as a missing unit price).
+    priced = [it for it in items if it.get("unit_price") not in (None, "")]
     kept: list[dict[str, Any]] = []
     for it in items:
-        key = (it.get("part_number"), it.get("quantity"))
-        if key in priced_keys and it.get("unit_price") in (None, ""):
+        if it.get("unit_price") in (None, "") and _is_repeat_of_priced_row(it, priced):
             warnings.append(
-                f"[line_items] dropped priceless duplicate of part '{it.get('part_number')}' "
+                f"[line_items] dropped priceless duplicate of '{it.get('part_number') or it.get('product_description')}' "
                 f"(qty {it.get('quantity')}) -- looks like a packing-list repeat, not a new item"
             )
             continue
         kept.append(it)
     return kept
+
+
+def _norm_desc(s: Any) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^A-Z0-9 ]", " ", str(s or "").upper())).strip()
+
+
+def _desc_similarity(a: Any, b: Any) -> float:
+    """How alike two item descriptions are, 0..1. The larger of:
+      - whole-string similarity, and
+      - word overlap: the fraction of the SHORTER description's words that
+        fuzzily appear in the longer one (needs at least 2 matching words).
+    The second matters because the same item is often printed with extra
+    trailing detail in another document -- confirmed real case: "AMLODIPINE
+    BESYLATE PH.EUR" vs "JAMLODIPIN R93339 BESILATE P1 PH.EUR Batch:
+    AAAL 6070071 Mfg.Date: ... Packing Details: 1X30.00 KGS" scores only
+    0.32 as whole strings, but every word of the short one is in the long
+    one (OCR spelling noise allowed)."""
+    from difflib import SequenceMatcher
+    na, nb = _norm_desc(a), _norm_desc(b)
+    if not na or not nb:
+        return 0.0
+    whole = SequenceMatcher(None, na, nb).ratio()
+    short, long_ = sorted((na.split(), nb.split()), key=len)
+    matched = sum(
+        1 for t in short
+        if any(t == w or SequenceMatcher(None, t, w).ratio() >= 0.8 for w in long_)
+    )
+    overlap = matched / len(short) if matched >= 2 else 0.0
+    return max(whole, overlap)
+
+
+# Descriptions of the SAME item re-read by OCR on another page differ by a
+# character or two; this is high enough that two different products never
+# clear it.
+_REPEAT_DESC_SIMILARITY = 0.85
+
+
+def _is_repeat_of_priced_row(it: dict[str, Any], priced: list[dict[str, Any]]) -> bool:
+    """Same quantity as some priced row AND (same part number, or a
+    near-identical description)."""
+    for p in priced:
+        if p is it or p.get("quantity") != it.get("quantity") or it.get("quantity") in (None, ""):
+            continue
+        if it.get("part_number") and it.get("part_number") == p.get("part_number"):
+            return True
+        if not it.get("part_number") and _desc_similarity(
+            it.get("product_description"), p.get("product_description"),
+        ) >= _REPEAT_DESC_SIMILARITY:
+            return True
+    return False
+
+
+def _shared_long_words(a: Any, b: Any, min_len: int = 5) -> int:
+    """How many words of at least `min_len` characters one description
+    shares (fuzzily, tolerating OCR spelling noise) with the other. A
+    stricter signal than whole-description similarity for items whose
+    descriptions carry DIFFERENT extra text in different documents --
+    confirmed real case: "AMLODIPINE BESYLATE PH.EUR [1X30 KGS]" vs
+    "Amiodipine Besilate-Hetero Mfg Part No:11101355-HETERO" share only the
+    two drug-name words, so overlap-as-a-fraction is a low 0.33."""
+    from difflib import SequenceMatcher
+    ta = [w for w in _norm_desc(a).split() if len(w) >= min_len]
+    tb = [w for w in _norm_desc(b).split() if len(w) >= min_len]
+    if not ta or not tb:
+        return 0
+    short, long_ = (ta, tb) if len(ta) <= len(tb) else (tb, ta)
+    return sum(
+        1 for t in short
+        if any(t == w or SequenceMatcher(None, t, w).ratio() >= 0.8 for w in long_)
+    )
+
+
+def _drop_duplicates_that_break_total(
+    items: list[dict[str, Any]], header: dict[str, Any], warnings: list[str]
+) -> list[dict[str, Any]]:
+    """
+    Some PDFs bundle several documents -- commercial invoice, purchase
+    order, export/GST invoice copy, ... -- that each repeat the same item
+    line with the same quantity, rate and amount. Confirmed real case: an
+    18-page bundle yielded three "line items" (30 KG x 80.00 = 2,400.00,
+    from three different documents) against a printed invoice total of
+    2,400.00 -- the total was right, the item list was tripled.
+
+    Identical-looking lines can also be GENUINE (two batches, same
+    quantity and price), so nothing is dropped on similarity alone. Rows
+    are dropped ONLY IF removing them makes the line amounts add up to the
+    invoice's own printed total: the document itself is the evidence. When
+    the lines already reconcile (the genuine-repeat case) or no removal
+    would, the list is returned untouched.
+    """
+    from itertools import combinations
+
+    total = header.get("invoice_total")
+    if isinstance(total, bool) or not isinstance(total, (int, float)) or total <= 0 or len(items) < 2:
+        return items
+    amounts = [it.get("line_total") for it in items]
+    if any(isinstance(a, bool) or not isinstance(a, (int, float)) for a in amounts):
+        return items
+    line_sum = sum(amounts)
+    if abs(line_sum - total) <= 0.05:
+        return items
+
+    def _sig(it: dict[str, Any]):
+        vals = (it.get("quantity"), it.get("unit_price"), it.get("line_total"))
+        return vals if all(isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 for v in vals) else None
+
+    kept: list[dict[str, Any]] = []
+    candidates: list[int] = []
+    for idx, it in enumerate(items):
+        sig = _sig(it)
+        # Same quantity/rate/amount AND recognisably the same item: either
+        # similar descriptions, or at least two shared (fuzzy) long words.
+        # The printed-total reconciliation below is the real safeguard.
+        twin = next((k for k in kept if sig and _sig(k) == sig and (
+            _desc_similarity(it.get("product_description"), k.get("product_description")) >= 0.6
+            or _shared_long_words(it.get("product_description"), k.get("product_description")) >= 2
+        )), None)
+        if twin is not None:
+            candidates.append(idx)
+        else:
+            kept.append(it)
+
+    for r in range(1, len(candidates) + 1):
+        for combo in combinations(candidates, r):
+            if abs(line_sum - sum(amounts[i] for i in combo) - total) <= 0.05:
+                warnings.append(
+                    f"[line_items] dropped {r} repeated line(s) (rows {', '.join(str(i + 1) for i in combo)}): "
+                    f"identical quantity/rate/amount to an earlier line, and line amounts only reconcile with "
+                    f"the printed invoice total ({total}) without them -- the same item appearing in more "
+                    f"than one document of a bundled PDF"
+                )
+                return [it for i, it in enumerate(items) if i not in combo]
+    return items
 
 
 def _renumber_items_if_ser_no_resets(items: list[dict[str, Any]], warnings: list[str]) -> None:
@@ -666,6 +870,7 @@ def validate_and_coerce(
         ser_no += 1
 
     generic_items = _drop_packing_list_duplicates(generic_items, warnings)
+    generic_items = _drop_duplicates_that_break_total(generic_items, cleaned_header, warnings)
     _renumber_items_if_ser_no_resets(generic_items, warnings)
 
     item_sheet_name = ITEM_SHEET_NAME[shipment_type]

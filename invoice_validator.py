@@ -86,6 +86,12 @@ RETRYABLE_RULES = {
     "COUNTRY_OF_ORIGIN_CONSISTENCY",
     "FORMAT_TYPE",
     "MULTI_INVOICE_TOTAL_SPLIT",
+    # Line amounts add up to LESS than the printed total -> rows were
+    # probably skipped. Retries only the ITEMS pass (see _ITEM_RULES) and
+    # never touches the header, so it can't repeat the HEADER_LINE_TOTAL
+    # failure below where a retry overwrote a correct total.
+    "LINE_ITEMS_INCOMPLETE",
+    "HSN_FORMAT",
 }
 # HEADER_LINE_TOTAL is deliberately NOT here despite being an ERROR-level
 # rule (see validate_totals): a confirmed real retry on this exact rule
@@ -345,9 +351,22 @@ def validate_line_items(
             continue
 
         expected = (qty * price).quantize(Decimal("0.01"))
-        actual = amount.quantize(Decimal("0.01")) if amount == amount.to_integral() else amount
         diff = abs(expected - amount)
-        if diff <= tolerance:
+        if amount == 0 and expected > 0:
+            # A line printed with a zero amount despite a real quantity and
+            # unit price is a free-of-cost line (samples, warranty
+            # replacements) -- a legitimate document state, so not an
+            # ERROR, and not retryable: no re-extraction can make a printed
+            # 0 equal qty x price, it could only invent a charge.
+            checks.append(ValidationCheck(
+                rule="QTY_X_UNIT_PRICE", status="WARNING", item=idx, field=amount_col,
+                expected=expected, actual=amount, difference=diff,
+                message=(
+                    f"Item {idx}: {amount_col} is 0 although Quantity ({qty}) x Unit Price "
+                    f"({price}) = {expected} -- free-of-cost line? Verify against the document."
+                ),
+            ))
+        elif diff <= tolerance:
             checks.append(ValidationCheck(
                 rule="QTY_X_UNIT_PRICE", status="PASS", item=idx,
                 field=amount_col, expected=expected, actual=amount, difference=diff,
@@ -399,9 +418,81 @@ def _parse_header_total(header: dict[str, Any]) -> Decimal | None:
     return sum(decimals, Decimal("0")) if decimals else None
 
 
+# ── Invoice-level adjustments between the line sum and the total ────────
+#
+# Many invoices print "TOTAL / LESS TRADE DISCOUNT / ADD AIR FREIGHT /
+# G-Total", so the invoice total legitimately differs from the sum of the
+# lines. Confirmed real case: all 10 invoices from one exporter failed
+# HEADER_LINE_TOTAL purely because of this, though every total was
+# extracted correctly (line sum 14,000.00 - discount 35.00 + freight 531.28
+# == printed G-Total 14,496.28).
+#
+# Rather than trust a keyword alone, the adjustments are read from the
+# source text and only ever used if some combination of them makes the
+# arithmetic reconcile to within tolerance -- so a genuinely wrong total
+# (the Piramal case in validate_totals) still fails, and a stray
+# "commission" or "charges" line that doesn't fit the arithmetic is simply
+# not used.
+
+_ADJUSTMENT_NEG_RE = re.compile(r"\b(?:less|discount|rebate|deduction|deduct)\b", re.IGNORECASE)
+_ADJUSTMENT_POS_RE = re.compile(
+    r"\b(?:add|freight|insurance|packing|packaging|handling|forwarding|charges?)\b", re.IGNORECASE,
+)
+# A money amount with exactly two decimals; not part of a longer number and
+# not a percentage ("0.25%" is a rate, not an amount).
+_AMOUNT_RE = re.compile(r"(?<![\d.,])\d[\d,]*\.\d{2}(?!\d)(?!\s*%)")
+# More candidate lines than this is a sign the "keyword" lines are really
+# item rows or prose -- too noisy to search for a reconciling subset.
+_MAX_ADJUSTMENT_CANDIDATES = 8
+
+
+def _find_adjustment_candidates(invoice_text: str) -> list[tuple[str, Decimal]]:
+    """(label, signed amount) for each text line that looks like a
+    discount/charge line with an amount on it: negative for
+    less/discount/rebate/deduction wording, positive for
+    add/freight/insurance/packing/handling/charges wording. The amount is
+    the LAST one on the line (the right-hand column). Duplicate lines
+    (same label and amount, e.g. a repeated text layer) count once."""
+    seen: set[tuple[str, Decimal]] = set()
+    found: list[tuple[str, Decimal]] = []
+    for line in (invoice_text or "").splitlines():
+        amounts = _AMOUNT_RE.findall(line)
+        if not amounts:
+            continue
+        negative = _ADJUSTMENT_NEG_RE.search(line) is not None
+        if not negative and _ADJUSTMENT_POS_RE.search(line) is None:
+            continue
+        amount = _to_decimal(amounts[-1].replace(",", ""))
+        if amount is None:
+            continue
+        label = re.sub(r"[│\s]+", " ", line).strip()
+        label = re.sub(r"\s*[\d,]+\.\d{2}\s*$", "", label)[:60]
+        signed = -amount if negative else amount
+        if (label, signed) not in seen:
+            seen.add((label, signed))
+            found.append((label, signed))
+    return found
+
+
+def _reconcile_with_adjustments(
+    base: Decimal, target: Decimal, candidates: list[tuple[str, Decimal]], tolerance: Decimal,
+) -> list[tuple[str, Decimal]] | None:
+    """The smallest subset of `candidates` whose signed amounts take `base`
+    to `target` within `tolerance`, or None if no subset does."""
+    from itertools import combinations
+
+    if not candidates or len(candidates) > _MAX_ADJUSTMENT_CANDIDATES:
+        return None
+    for size in range(1, len(candidates) + 1):
+        for subset in combinations(candidates, size):
+            if abs(base + sum((amt for _, amt in subset), Decimal("0")) - target) <= tolerance:
+                return list(subset)
+    return None
+
+
 def validate_totals(
     header: dict[str, Any], items: list[dict[str, Any]], shipment_type: str,
-    tolerance: Decimal = AMOUNT_TOLERANCE,
+    tolerance: Decimal = AMOUNT_TOLERANCE, invoice_text: str = "",
 ) -> list[ValidationCheck]:
     """
     HEADER_LINE_TOTAL: calculated_total = sum(valid line amounts) vs
@@ -410,24 +501,24 @@ def validate_totals(
     Item_Taxable_Val qualify today; NOT_CHECKED only for a hypothetical
     template with neither.
 
-    A line item missing its own amount is EXCLUDED from the sum rather
-    than treated as zero: a genuinely-zero line and a not-extracted line
-    aren't the same thing, and silently summing a missing value as 0
-    would produce a false HEADER_LINE_TOTAL mismatch that's really a
-    missing-data problem -- already caught separately by
-    REQUIRED_FIELD_MISSING / QTY_X_UNIT_PRICE for that specific row.
+    If ANY line item is missing its own amount, this is NOT_CHECKED
+    rather than summing the rest: a partial sum can't be compared to a
+    whole-invoice total -- it would produce a guaranteed, misleading
+    "mismatch" ERROR that's really a missing-data problem. (Missing
+    amounts used to be papered over by validate.py computing qty x price
+    into them; that no longer happens, so partial sums are now a real
+    case.) A genuinely-zero line (free of cost) is a real amount and IS
+    summed -- 0 and missing aren't the same thing.
 
-    Other header-level arithmetic the spec asks for (subtotal vs sum of
-    lines, discount amount vs discount percentage, round-off, freight,
-    other charges) is deliberately NOT implemented as hardcoded checks
-    here: this project's current header schema (see validate.py's
-    _HEADER_FIELDS) has no subtotal / discount / round_off / freight /
-    other_charges fields at all -- they are never extracted today, so a
-    rule that "checks" them would either invent fields that don't exist
-    or silently always NOT_CHECK, which is functionally the same as not
-    having the rule. If/when those fields are added to the schema, the
-    same _to_decimal + tolerance-comparison pattern used here extends
-    directly to them -- see the module docstring's point on this.
+    Discounts and charges (freight, insurance, packing, ...): the header
+    schema has no fields for them, so they're not extracted by the LLM.
+    Instead, when the line sum doesn't equal the total, the discount /
+    freight lines printed in `invoice_text` are read directly (see
+    _find_adjustment_candidates) and the check PASSES if some combination
+    of them reconciles line sum -> total within tolerance. Anything they
+    can't explain is still the same non-retryable ERROR as before, so a
+    genuinely wrong printed total isn't masked. Without `invoice_text`
+    this behaves exactly as it did before adjustments were supported.
     """
     checks = []
 
@@ -489,6 +580,16 @@ def validate_totals(
             message="Missing header invoice_total, or no line amounts available to sum.",
         ))
         return checks
+    n_missing = len(line_amounts) - len(valid_amounts)
+    if n_missing:
+        checks.append(ValidationCheck(
+            rule="HEADER_LINE_TOTAL", status="NOT_CHECKED",
+            message=(
+                f"{n_missing} of {len(line_amounts)} line item(s) have no line amount -- "
+                f"a partial sum can't be reconciled against the invoice total."
+            ),
+        ))
+        return checks
 
     calculated_total = sum(valid_amounts, Decimal("0"))
     diff = abs(calculated_total - invoice_total)
@@ -496,6 +597,40 @@ def validate_totals(
         checks.append(ValidationCheck(
             rule="HEADER_LINE_TOTAL", status="PASS", field="invoice_total",
             expected=calculated_total, actual=invoice_total, difference=diff,
+        ))
+    elif (adjustments := _reconcile_with_adjustments(
+        calculated_total, invoice_total, _find_adjustment_candidates(invoice_text), tolerance,
+    )) is not None:
+        applied = ", ".join(f"{label} ({amt:+})" for label, amt in adjustments)
+        checks.append(ValidationCheck(
+            rule="HEADER_LINE_TOTAL", status="PASS", field="invoice_total",
+            expected=calculated_total + sum((amt for _, amt in adjustments), Decimal("0")),
+            actual=invoice_total, difference=abs(
+                calculated_total + sum((amt for _, amt in adjustments), Decimal("0")) - invoice_total
+            ),
+            message=(
+                f"invoice_total {invoice_total} reconciles with the line total "
+                f"{calculated_total} after the adjustment(s) printed on the invoice: {applied}."
+            ),
+        ))
+    elif invoice_total - calculated_total > tolerance:
+        # The lines add up to LESS than the printed total (and no printed
+        # discount/freight line explains the gap). Confirmed real case: 4 of
+        # 8 failing JCB invoices -- every printed total was right, and the
+        # source table's rows summed to it exactly, but the model had
+        # stopped after about one page of rows (14 of 28, 28 of 45, ...).
+        # That's an INCOMPLETE item list, which a re-extraction of the items
+        # (never the header) can fix -- unlike the over-count case below.
+        checks.append(ValidationCheck(
+            rule="LINE_ITEMS_INCOMPLETE", status="ERROR", field="line_items",
+            expected=invoice_total, actual=calculated_total, difference=diff,
+            message=(
+                f"The invoice's printed total is {invoice_total} but the {len(valid_amounts)} line "
+                f"item(s) extracted add up to only {calculated_total} ({diff} short): rows were "
+                f"probably skipped, or a line amount was misread. Extract EVERY row of the item table, "
+                f"from EVERY page -- a table that continues onto later pages is one table -- and copy "
+                f"each row's unit price and amount from the right columns. Do not invent rows or amounts."
+            ),
         ))
     else:
         # ERROR, but deliberately NOT retryable: a mismatch here is
@@ -848,6 +983,22 @@ def _find_labeled_value(patterns: list[re.Pattern], text: str) -> str | None:
     return None
 
 
+def _find_all_labeled_values(patterns: list[re.Pattern], text: str) -> list[str]:
+    """Every labeled value found by any pattern, in first-seen order and
+    de-duplicated (case/whitespace-insensitively). For fields that can
+    legitimately appear several times in one document, unlike
+    _find_labeled_value's single first hit."""
+    found: list[str] = []
+    seen: set[str] = set()
+    for pat in patterns:
+        for m in pat.finditer(text or ""):
+            norm = _normalize_token(m.group(1))
+            if norm not in seen:
+                seen.add(norm)
+                found.append(m.group(1))
+    return found
+
+
 def validate_source_consistency(
     items: list[dict[str, Any]], shipment_type: str, invoice_text: str
 ) -> list[ValidationCheck]:
@@ -946,13 +1097,20 @@ def validate_source_consistency(
             continue
         seen_order_values.add(norm_order)
 
-        order_in_text = _find_labeled_value(_ORDER_NO_PATTERNS, invoice_text)
-        if order_in_text is None:
+        # Every labeled order number in the document, not just the first:
+        # an invoice with several POs (one per line or section) has several
+        # "Order No:"/"P/O:" labels, and comparing each item's PO against
+        # only the FIRST one flagged every other item as a retryable ERROR
+        # that no re-extraction could ever fix.
+        orders_in_text = _find_all_labeled_values(_ORDER_NO_PATTERNS, invoice_text)
+        if not orders_in_text:
             checks.append(ValidationCheck(
                 rule="ORDER_NUMBER_SOURCE_MATCH", status="NOT_CHECKED", item=idx,
                 message="No 'P/O:'/'Order No:' label found in the source text to check against.",
             ))
-        elif _normalize_token(order_in_text) in norm_order or norm_order in _normalize_token(order_in_text):
+        elif any(
+            (n := _normalize_token(o)) in norm_order or norm_order in n for o in orders_in_text
+        ):
             # order_number sometimes legitimately carries extra context
             # (a date, a second PO) beyond the bare number found by the
             # label regex -- see llm_extract.py's own prompt rule 8 on
@@ -960,15 +1118,16 @@ def validate_source_consistency(
             # not strict equality.
             checks.append(ValidationCheck(
                 rule="ORDER_NUMBER_SOURCE_MATCH", status="PASS", item=idx, field="order_number",
-                expected=order_in_text, actual=extracted_order,
+                expected=", ".join(orders_in_text), actual=extracted_order,
             ))
         else:
+            shown = ", ".join(f"'{o}'" for o in orders_in_text)
             checks.append(ValidationCheck(
                 rule="ORDER_NUMBER_SOURCE_MATCH", status="ERROR", item=idx, field="order_number",
-                expected=order_in_text, actual=extracted_order, retryable=True,
+                expected=", ".join(orders_in_text), actual=extracted_order, retryable=True,
                 message=(
-                    f"Item {idx}: source text shows order number '{order_in_text}', "
-                    f"but extracted order_number is '{extracted_order}'."
+                    f"Item {idx}: source text shows order number(s) {shown}, "
+                    f"but extracted order_number is '{extracted_order}' -- it matches none of them."
                 ),
             ))
 
@@ -1044,6 +1203,38 @@ def validate_format_and_types(
                 ))
             else:
                 checks.append(ValidationCheck(rule="FORMAT_TYPE", status="PASS", item=idx, field=col))
+
+    # -- Line items: the HSN / tariff code must look like one --
+    # An HSN is 4, 6 or 8 digits. Confirmed real case (JCB invoices): the
+    # model kept putting the neighbouring "Item No" column (10, 120, 160...)
+    # into Item_RITC -- 17 of 17 rows on one invoice that still passed every
+    # arithmetic check, since nothing looked at this field at all. 1-3 digits
+    # can never be an HSN, so that's a retryable ERROR; other odd lengths
+    # (5, 7, 9, 10+ digits -- some suppliers print longer national codes) are
+    # only a WARNING. Blank is fine: plenty of invoices print no HSN.
+    hsn_col = _item_field(shipment_type, "hsn")
+    if hsn_col:
+        for idx, item in enumerate(items, start=1):
+            raw = item.get(hsn_col)
+            if raw is None or str(raw).strip() == "":
+                continue
+            n_digits = len(re.sub(r"\D", "", str(raw)))
+            if n_digits in (4, 6, 8):
+                checks.append(ValidationCheck(rule="HSN_FORMAT", status="PASS", item=idx, field=hsn_col))
+            elif 1 <= n_digits <= 3:
+                checks.append(ValidationCheck(
+                    rule="HSN_FORMAT", status="ERROR", item=idx, field=hsn_col, actual=raw, retryable=True,
+                    message=(
+                        f"Item {idx}: {hsn_col} '{raw}' has only {n_digits} digit(s), so it is not an HSN / "
+                        f"tariff code (4, 6 or 8 digits) -- it looks like an item or line number. Read the "
+                        f"'HSN Code' column instead, or return null if no HSN is printed for this row."
+                    ),
+                ))
+            else:
+                checks.append(ValidationCheck(
+                    rule="HSN_FORMAT", status="WARNING", item=idx, field=hsn_col, actual=raw,
+                    message=f"Item {idx}: {hsn_col} '{raw}' has {n_digits} digit(s); an HSN is normally 4, 6 or 8.",
+                ))
 
     # -- Header: invoice_total numeric and non-negative --
     # Uses _parse_header_total, not a plain numeric parse, so a
@@ -1189,7 +1380,7 @@ def validate_invoice(
     checks: list[ValidationCheck] = []
     checks += validate_required_fields(items, shipment_type)
     checks += validate_line_items(items, shipment_type, tolerance)
-    checks += validate_totals(header, items, shipment_type, tolerance)
+    checks += validate_totals(header, items, shipment_type, tolerance, invoice_text=invoice_text)
     checks += validate_taxes(items, shipment_type, tolerance)
     checks += validate_cross_fields(header, items, shipment_type)
     checks += validate_source_consistency(items, shipment_type, invoice_text)
@@ -1215,7 +1406,7 @@ _HEADER_RULES = {"HEADER_LINE_TOTAL", "MULTI_INVOICE_TOTAL_SPLIT"}
 _ITEM_RULES = {
     "QTY_X_UNIT_PRICE", "TAX_RECONCILIATION", "PART_NUMBER_SOURCE_MATCH",
     "MODEL_SOURCE_MATCH", "ORDER_NUMBER_SOURCE_MATCH", "QTY_VS_TARIFF_QTY",
-    "UNIT_VS_TARIFF_UNIT",
+    "UNIT_VS_TARIFF_UNIT", "LINE_ITEMS_INCOMPLETE", "HSN_FORMAT",
 }
 # REQUIRED_FIELD_MISSING, FORMAT_TYPE, COUNTRY_OF_ORIGIN_CONSISTENCY can
 # legitimately be either, depending on which field failed -- routed per

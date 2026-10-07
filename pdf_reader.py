@@ -40,12 +40,20 @@ import statistics
 import pdfplumber
 import pypdfium2 as pdfium
 
+logger = logging.getLogger("invoice_extractor")
+
 try:
     import scan_validator
-except Exception:
+except Exception as _scan_validator_import_error:
     scan_validator = None
-
-logger = logging.getLogger("invoice_extractor")
+    # Loud on purpose: with scan_validator unavailable, tilt correction and
+    # the clipped-table refusal are both disabled, and every caller treats
+    # that as "no problem found". It used to be completely silent, so an
+    # OpenCV upgrade breaking it went unnoticed across 100+ extractions.
+    logger.warning(
+        "scan_validator could not be imported (%s) -- tilt correction and "
+        "clipped-table detection are DISABLED", _scan_validator_import_error,
+    )
 
 
 class ClippedTableError(RuntimeError):
@@ -169,7 +177,46 @@ def _dedupe_overlapping_chars(
                 break
         if not is_dup:
             kept.append(c)
-    return kept
+    return _drop_spaces_inside_glyphs(kept)
+
+
+def _drop_spaces_inside_glyphs(chars: list[dict], window: int = 12, overlap_fraction: float = 0.5) -> list[dict]:
+    """
+    Remove space characters that sit on top of a visible glyph.
+
+    Some generators right-align a number by padding it with space glyphs,
+    and the last pad space can overlap the number's first digit. Sorted by
+    x0 the space then lands BETWEEN the first and second digit, and
+    extract_words() splits one number into two tokens. Confirmed on real
+    invoices: "22,476.03" came out as "2 2,476.03", "23,150.31" as
+    "2 3,150.31" and "560.90" survived only as "5 60.90" -- the model read
+    the lone leading digit as noise and dropped it, so a total of 23,150.31
+    was extracted as 3,150.31 and a freight of 560.90 as 60.90. A space that
+    lies mostly inside a visible glyph's own horizontal span on the same
+    line is padding, never a real word gap (real gaps sit between glyphs),
+    so it is dropped. `kept` is in (top, x0) order, so the overlapping glyph
+    is always within a few positions of its space.
+    """
+    drop: set[int] = set()
+    for i, c in enumerate(chars):
+        if not c["text"].isspace():
+            continue
+        if "x1" not in c:
+            continue
+        width = c["x1"] - c["x0"]
+        if width <= 0:
+            continue
+        for j in range(max(0, i - window), min(len(chars), i + window + 1)):
+            g = chars[j]
+            if j == i or g["text"].isspace() or "x1" not in g:
+                continue
+            if abs(g["top"] - c["top"]) > max(1.0, 0.35 * (g["bottom"] - g["top"])):
+                continue
+            inside = min(c["x1"], g["x1"]) - max(c["x0"], g["x0"])
+            if inside >= overlap_fraction * width:
+                drop.add(i)
+                break
+    return [c for i, c in enumerate(chars) if i not in drop] if drop else chars
 
 
 def _detect_column_boundaries(
@@ -441,7 +488,9 @@ def _detect_page_skew(pdf_path: str | Path, page_index: int) -> float | None:
     try:
         return scan_validator.validate_pdf(str(pdf_path), page=page_index)["skew_deg"]
     except Exception as e:
-        logger.debug("%s page %d: skew detection failed (%s)", pdf_path, page_index, e)
+        # warning, not debug: a failure here means this page's tilt is going
+        # uncorrected, which should never be invisible at default log levels.
+        logger.warning("%s page %d: skew detection failed (%s) -- tilt NOT corrected", pdf_path, page_index, e)
         return None
 
 
@@ -1179,7 +1228,10 @@ def check_scan_quality(pdf_path: str | Path) -> dict | None:
             logger.warning("%s: scan quality check failed: %s", pdf_path, scan_quality["reasons"])
         return scan_quality
     except Exception as e:
-        logger.debug("%s: scan quality check could not run (%s)", pdf_path, e)
+        # warning, not debug: None here is indistinguishable from "fine" to
+        # callers, so the only trace that the clipped-table check never ran
+        # is this log line.
+        logger.warning("%s: scan quality check could not run (%s) -- clipped-table check SKIPPED", pdf_path, e)
         return None
 
 
@@ -1253,8 +1305,19 @@ def extract_text(
         use_force_flag = force_ocr
 
     # 3. Scanned PDF / image: Try OCRmyPDF Docker first (with --rotate-pages for auto-orientation)
-    docker_pdf, docker_time = _ocr_with_docker(pdf_path, force_ocr=use_force_flag)
-    if docker_pdf is not None:
+    # --skip-text leaves vector-only pages (no text layer AND no raster
+    # images) untouched and still exits 0 -- so in auto mode, if that pass
+    # yields too little text, retry once with --force-ocr before giving up
+    # on Docker (keeps OCRmyPDF's word coordinates instead of RapidOCR's).
+    flags = [use_force_flag]
+    if force_ocr is None and not use_force_flag:
+        flags.append(True)
+    docker_time = 0.0
+    for i, flag in enumerate(flags):
+        docker_pdf, t = _ocr_with_docker(pdf_path, force_ocr=flag)
+        docker_time += t
+        if docker_pdf is None:
+            continue
         try:
             d_text = extract_full_pdf(docker_pdf)
             if len(d_text) >= min_chars_for_text_layer:
@@ -1268,6 +1331,12 @@ def extract_text(
                     os.unlink(docker_pdf)
                 except Exception:
                     pass
+        if i + 1 < len(flags):
+            logger.warning(
+                "%s: Docker OCR with --skip-text produced <%d chars (likely vector-only "
+                "pages) -- retrying with --force-ocr", pdf_path, min_chars_for_text_layer,
+            )
+    logger.warning("%s: Docker OCR yielded no usable text -- falling back to Python OCR", pdf_path)
 
     # 4. Fallback to Python OCR (RapidOCR / PaddleOCR / PaddleOCR-VL)
     ocr_text, ocr_tables, engine_type, ocr_time = _ocr(pdf_path)

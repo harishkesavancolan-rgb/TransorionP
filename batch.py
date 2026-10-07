@@ -208,7 +208,7 @@ def main():
     ap.add_argument("--type", choices=["import", "export", "auto"], default="auto",
                     help="Force every file to this shipment type instead of auto-detecting per file")
     ap.add_argument("--model", default="gpt-5-nano")
-    ap.add_argument("--out-dir", default="result_fused1")
+    ap.add_argument("--out-dir", default="dump/unique_punch")
     ap.add_argument("--workers", type=int, default=5,
                     help="How many PDFs to process concurrently (default: 5). "
                          "Increase if your API tier allows higher rate limits, "

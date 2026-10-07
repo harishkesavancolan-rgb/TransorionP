@@ -1,0 +1,11 @@
+﻿file,status,shipment_type,method,ocr_time_sec,time_sec,item_rows,total_tokens,cost_inr,warnings,extraction_status,attempts,validation_errors
+AC00600266 INV.pdf,ok,export,2d_layout_canvas,0.0,74.3,1,13953,0.2487,0,validated,1,0
+AC00600267 INV.pdf,ok,export,2d_layout_canvas,0.0,67.6,1,13855,0.2444,0,validated,1,0
+AC00600275 INV.pdf,ok,export,2d_layout_canvas,0.0,79.5,1,14604,0.2724,0,validated,1,0
+AC00600276 INV.pdf,ok,export,2d_layout_canvas,0.0,64.9,1,13830,0.2461,0,validated,1,0
+AC00600345 INV.pdf,ok,export,2d_layout_canvas,0.0,69.9,1,14899,0.2716,0,validated,1,0
+AC00600364 INV.pdf,ok,export,2d_layout_canvas,0.0,93.5,1,16385,0.3218,0,validated,1,0
+AC00600373 INV.pdf,ok,export,2d_layout_canvas,0.0,77.0,1,14876,0.2703,0,validated,1,0
+AC00600404 INV.pdf,ok,export,2d_layout_canvas,0.0,80.8,1,15743,0.2986,0,validated,1,0
+AC00600406 INV.pdf,ok,export,2d_layout_canvas,0.0,63.6,1,17223,0.2274,0,validated,2,0
+AC00600407 INV.pdf,ok,export,2d_layout_canvas,0.0,91.2,1,17325,0.3536,0,validated,1,0

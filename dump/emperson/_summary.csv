@@ -1,0 +1,14 @@
+﻿file,status,shipment_type,method,ocr_time_sec,time_sec,item_rows,total_tokens,cost_inr,warnings,extraction_status,attempts,validation_errors
+EMERSON PROCESS MUM SEA EXP/ACT260102255 INV.pdf,"skipped: table clipped -- needs manual review, or re-run with --allow-clipped",,,0.0,0.0,0,0,0.0,0,,0,0
+EMERSON PROCESS MUM SEA EXP/ACT260102263 INV.pdf,"skipped: table clipped -- needs manual review, or re-run with --allow-clipped",,,0.0,0.0,0,0,0.0,0,,0,0
+EMERSON PROCESS MUM SEA EXP/ACT260102264 INV.pdf,"skipped: table clipped -- needs manual review, or re-run with --allow-clipped",,,0.0,0.0,0,0,0.0,0,,0,0
+EMERSON PROCESS MUM SEA EXP/ACT260102272 INV.pdf,"skipped: table clipped -- needs manual review, or re-run with --allow-clipped",,,0.0,0.0,0,0,0.0,0,,0,0
+EMERSON PROCESS MUM SEA EXP/ACT260102278 INV.pdf,"skipped: table clipped -- needs manual review, or re-run with --allow-clipped",,,0.0,0.0,0,0,0.0,0,,0,0
+EMERSON PROCESS MUM SEA EXP/ACT260102279 INV.pdf,"skipped: table clipped -- needs manual review, or re-run with --allow-clipped",,,0.0,0.0,0,0,0.0,0,,0,0
+EMERSON PROCESS MUM SEA EXP/ACT260102280 INV.pdf,"skipped: table clipped -- needs manual review, or re-run with --allow-clipped",,,0.0,0.0,0,0,0.0,0,,0,0
+EMERSON PROCESS MUM SEA EXP/ACT260102281 INV.pdf,"skipped: table clipped -- needs manual review, or re-run with --allow-clipped",,,0.0,0.0,0,0,0.0,0,,0,0
+EMERSON PROCESS MUM SEA EXP/ACT260102286 INV.pdf,"skipped: table clipped -- needs manual review, or re-run with --allow-clipped",,,0.0,0.0,0,0,0.0,0,,0,0
+EMERSON PROCESS MUM SEA EXP/ACT260102287 INV.pdf,"skipped: table clipped -- needs manual review, or re-run with --allow-clipped",,,0.0,0.0,0,0,0.0,0,,0,0
+EMERSON PROCESS MUM SEA EXP/ACT260102288 INV.pdf,"skipped: table clipped -- needs manual review, or re-run with --allow-clipped",,,0.0,0.0,0,0,0.0,0,,0,0
+EMERSON PROCESS MUM SEA EXP/ACT260102289 INV.pdf,"skipped: table clipped -- needs manual review, or re-run with --allow-clipped",,,0.0,0.0,0,0,0.0,0,,0,0
+EMERSON PROCESS MUM SEA EXP/ACT260102291 INV.pdf,"skipped: table clipped -- needs manual review, or re-run with --allow-clipped",,,0.0,0.0,0,0,0.0,0,,0,0

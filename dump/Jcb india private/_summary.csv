@@ -1,0 +1,11 @@
+﻿file,status,shipment_type,method,ocr_time_sec,time_sec,item_rows,total_tokens,cost_inr,warnings,extraction_status,attempts,validation_errors
+2710_001.pdf,ok,export,ocrmypdf_docker,16.02,144.2,9,37483,0.4716,2,validation_failed,3,2
+CIV_MH2706213460-Airfreight 1.pdf,ok,export,2d_layout_canvas,0.0,139.2,14,31813,0.5782,0,validation_failed,1,1
+INNNNNNN.pdf,ok,export,ocrmypdf_docker,16.05,116.4,9,24009,0.462,1,validation_failed,1,1
+MH2706213444.pdf,ok,export,2d_layout_canvas,0.0,107.7,3,24467,0.5097,0,validated,1,0
+MH2706214838.pdf,ok,export,2d_layout_canvas,0.0,132.5,28,48638,0.7506,0,validation_failed,1,1
+MH2706214961.pdf,ok,export,2d_layout_canvas,0.0,107.6,18,30759,0.5304,1,validation_failed,1,1
+MH2706215472 BELL.pdf,ok,export,2d_layout_canvas,0.0,97.1,1,23109,0.4625,0,validation_failed,1,1
+MH2706220038 PDF.pdf,ok,export,2d_layout_canvas,0.0,96.8,17,27882,0.4889,0,validated,1,0
+MH2706224176 Bell Africa.pdf,ok,export,2d_layout_canvas,0.0,137.7,32,54895,0.7633,0,validated,2,0
+MH2706227647 Bell.pdf,ok,export,2d_layout_canvas,0.0,115.8,14,31416,0.6042,0,validation_failed,1,1

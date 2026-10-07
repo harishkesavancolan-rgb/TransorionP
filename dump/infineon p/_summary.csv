@@ -1,0 +1,11 @@
+﻿file,status,shipment_type,method,ocr_time_sec,time_sec,item_rows,total_tokens,cost_inr,warnings,extraction_status,attempts,validation_errors
+13 Aug Infineon IN International shipment tool - CN16702759 CIPL R 1.pdf,ok,export,2d_layout_canvas,0.0,212.6,19,47814,0.6145,0,validation_failed,3,1
+491498104699.pdf,ok,export,ocrmypdf_docker+rotation_recovered,54.92,156.4,1,26483,0.3276,0,validation_failed,3,1
+GlobalImagingDocuments1787807913736.pdf,ok,export,ocrmypdf_docker,10.17,125.3,1,76152,0.4422,0,validation_failed,3,2
+INV 1643350144.pdf,ok,export,ocrmypdf_docker,7.36,171.9,1,33285,0.7196,0,validated,2,0
+INV 4632766353.pdf,ok,export,ocrmypdf_docker,9.26,91.2,1,41048,0.4128,0,validation_failed,2,1
+INV 6388071185.pdf,ok,export,ocrmypdf_docker,7.4,71.5,6,23516,0.303,0,validation_failed,2,1
+INV 9149067056.pdf,ok,export,ocrmypdf_docker,6.0,42.8,1,13811,0.1902,0,validated,1,0
+Invoice 1.pdf,ok,export,ocrmypdf_docker,6.1,60.9,2,15324,0.2753,0,validated,1,0
+NOSTAS_CustomsInvoice_716N014687 1.pdf,ok,export,2d_layout_canvas,0.0,61.9,1,20894,0.3043,0,validation_failed,2,1
+PL & CI_260817_131349.pdf,ok,export,ocrmypdf_docker,6.13,53.7,1,14835,0.2346,1,validated,1,0

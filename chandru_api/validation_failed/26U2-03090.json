@@ -1,0 +1,182 @@
+{
+  "source_file": "26U2-03090.pdf",
+  "shipment_type": "export",
+  "detection": null,
+  "extraction_method": "ocrmypdf_docker+rotation_recovered",
+  "ocr_time_seconds": 48.72,
+  "scan_quality": {
+    "skew_deg": 0.0,
+    "skew_ok": true,
+    "clipped_edges": [],
+    "clipped": false,
+    "valid": true,
+    "reasons": [],
+    "n_lines_used": 107
+  },
+  "model": "gpt-5-nano",
+  "extraction_time_seconds": 162.43,
+  "token_usage": {
+    "input_tokens": 9895,
+    "cached_input_tokens": 9216,
+    "output_tokens": 6523,
+    "total_tokens": 25634,
+    "cost_usd": 0.00315,
+    "cost_inr": 0.3035
+  },
+  "header": {
+    "invoice_number": "",
+    "invoice_date": "",
+    "supplier_name": "",
+    "supplier_address": "",
+    "supplier_tax_id": "",
+    "buyer_name": "",
+    "buyer_address": "",
+    "consignee_name": "",
+    "consignee_address": "",
+    "currency": "",
+    "invoice_total": "",
+    "net_realisable_amount": "",
+    "tax_amount": "",
+    "tax_rate": "",
+    "payment_terms": "",
+    "country_of_origin": "",
+    "country_of_destination": "",
+    "transit_country": "",
+    "port_of_loading": "",
+    "port_of_discharge": "",
+    "export_type_status": "",
+    "reward_scheme_claim": "N",
+    "state_code": "",
+    "district_code": "",
+    "ad_code": "",
+    "iec_number": "",
+    "total_packages": "",
+    "gross_weight": "",
+    "net_weight": ""
+  },
+  "sheets": {
+    "ITEM": [],
+    "DRAWBACK": [],
+    "License": [],
+    "STR": [],
+    "AR4": [],
+    "ACCESSORY": [],
+    "THIRDPARTY": [],
+    "JOBWORK": [],
+    "InfoType": [],
+    "Constituent": [],
+    "Production": [],
+    "Control": [],
+    "ReExport": []
+  },
+  "warnings": [],
+  "validation": {
+    "valid": false,
+    "status": "INVALID",
+    "errors": [
+      {
+        "rule": "REQUIRED_FIELD_MISSING",
+        "status": "ERROR",
+        "message": "invoice_number is empty.",
+        "item": null,
+        "field": "invoice_number",
+        "expected": null,
+        "actual": null,
+        "difference": null,
+        "retryable": true
+      }
+    ],
+    "warnings": [],
+    "checks": [
+      {
+        "rule": "HEADER_LINE_TOTAL",
+        "status": "NOT_CHECKED",
+        "message": "Missing header invoice_total, or no line amounts available to sum.",
+        "item": null,
+        "field": null,
+        "expected": null,
+        "actual": null,
+        "difference": null,
+        "retryable": false
+      },
+      {
+        "rule": "REQUIRED_FIELD_MISSING",
+        "status": "ERROR",
+        "message": "invoice_number is empty.",
+        "item": null,
+        "field": "invoice_number",
+        "expected": null,
+        "actual": null,
+        "difference": null,
+        "retryable": true
+      },
+      {
+        "rule": "FORMAT_TYPE",
+        "status": "NOT_CHECKED",
+        "message": "invoice_date is empty.",
+        "item": null,
+        "field": "invoice_date",
+        "expected": null,
+        "actual": null,
+        "difference": null,
+        "retryable": false
+      }
+    ],
+    "passed_rules": []
+  },
+  "validation_history": [
+    {
+      "attempt": 1,
+      "valid": false,
+      "errors": [
+        {
+          "rule": "REQUIRED_FIELD_MISSING",
+          "status": "ERROR",
+          "message": "invoice_number is empty.",
+          "item": null,
+          "field": "invoice_number",
+          "expected": null,
+          "actual": null,
+          "difference": null,
+          "retryable": true
+        }
+      ]
+    },
+    {
+      "attempt": 2,
+      "valid": false,
+      "errors": [
+        {
+          "rule": "REQUIRED_FIELD_MISSING",
+          "status": "ERROR",
+          "message": "invoice_number is empty.",
+          "item": null,
+          "field": "invoice_number",
+          "expected": null,
+          "actual": null,
+          "difference": null,
+          "retryable": true
+        }
+      ]
+    },
+    {
+      "attempt": 3,
+      "valid": false,
+      "errors": [
+        {
+          "rule": "REQUIRED_FIELD_MISSING",
+          "status": "ERROR",
+          "message": "invoice_number is empty.",
+          "item": null,
+          "field": "invoice_number",
+          "expected": null,
+          "actual": null,
+          "difference": null,
+          "retryable": true
+        }
+      ]
+    }
+  ],
+  "attempts": 3,
+  "extraction_status": "validation_failed"
+}

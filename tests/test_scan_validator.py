@@ -83,6 +83,17 @@ def test_vertical_lines_terminating_at_top_edge_is_clipping():
     assert "top" in result["clipped_edges"]
 
 
+def test_find_line_segments_accepts_both_opencv_output_shapes(monkeypatch):
+    # OpenCV 4.x returns HoughLinesP results as (N, 1, 4); 5.x as (N, 4).
+    # The 5.x shape used to raise TypeError, which pdf_reader swallowed --
+    # silently disabling deskew and clipped-table detection entirely.
+    segs = np.array([[2, 100, 300, 100], [2, 300, 300, 300]], dtype=np.int32)
+    bw = np.zeros((_H, _W), dtype=np.uint8)
+    for shape in (segs.reshape(-1, 1, 4), segs):
+        monkeypatch.setattr(sv.cv2, "HoughLinesP", lambda *a, _s=shape, **k: _s)
+        assert sv._find_line_segments(bw) == [(2, 100, 300, 100), (2, 300, 300, 300)]
+
+
 def test_single_line_does_not_meet_independent_line_minimum():
     # Even a genuinely perpendicular line shouldn't be enough alone --
     # MIN_INDEPENDENT_LINES requires several before concluding a real

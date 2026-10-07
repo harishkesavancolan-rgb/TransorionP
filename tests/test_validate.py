@@ -163,6 +163,41 @@ def test_validate_and_coerce_export_no_confidence_and_blank_missing():
     assert not any(k for k in header if "confidence" in k.lower())
 
 
+# ── line_total is never invented from qty x price ──────────────────────
+
+def test_missing_line_total_is_left_blank_not_computed():
+    warnings = []
+    item = _clean_generic_item(
+        {"product_description": "WIDGET", "quantity": 5, "unit_price": 10.0}, warnings, 0, 1,
+    )
+    assert item["line_total"] == ""
+
+
+def test_free_of_cost_zero_line_total_is_kept_as_zero_with_warning():
+    warnings = []
+    item = _clean_generic_item(
+        {"product_description": "SAMPLE", "quantity": 5, "unit_price": 10.0, "line_total": 0},
+        warnings, 0, 1,
+    )
+    assert item["line_total"] == 0
+    assert any("free of cost" in w for w in warnings)
+
+
+def test_zero_line_total_survives_mapping_into_the_export_row():
+    # The 0 must reach the final template row as 0, not get blanked to ""
+    # (or recomputed) anywhere between cleaning and model validation.
+    schema = load_template_schema(_TEMPLATES / "EXP_TEMPLET.xlsx")
+    raw = {
+        "invoice_header": {"invoice_number": "INV-1"},
+        "line_items": [
+            {"item_ser_no": 1, "product_description": "SAMPLE", "quantity": 5, "unit_price": 10.0, "line_total": 0},
+            {"item_ser_no": 2, "product_description": "WIDGET", "quantity": 5, "unit_price": 10.0},
+        ],
+    }
+    sheets, _, _ = validate_and_coerce(raw, schema, "export")
+    assert [row["ItmTaxableVal"] for row in sheets["ITEM"]] == [0, ""]
+
+
 def test_validate_and_coerce_import_uses_boe_sheet():
     schema = load_template_schema(_TEMPLATES / "IMP_TEMPLET.xlsx")
     raw = {
@@ -225,3 +260,219 @@ def test_validate_and_coerce_renumbers_end_to_end_on_ser_no_reset():
     sheets, warnings, header = validate_and_coerce(raw, schema, "import")
     assert [row["SL_No"] for row in sheets["BOE"]] == [1, 2, 3, 4]
     assert any("reset or repeated" in w for w in warnings)
+
+
+# ── state_code is only cross-checked against a REAL (shape-valid) GSTIN ──
+
+def test_state_code_not_overridden_by_a_malformed_tax_id_starting_with_digits():
+    # An IEC (or any mis-read) in supplier_tax_id that merely STARTS with
+    # two digits is not a GSTIN and must not stomp a correct state_code.
+    warnings = []
+    clean = _clean_invoice_header(
+        {"supplier_tax_id": "0388012345", "state_code": "MH(27)"}, warnings, "export",
+    )
+    assert clean["state_code"] == "27"
+    assert not any("used the GSTIN" in w for w in warnings)
+
+
+def test_state_code_still_overridden_by_a_valid_gstin_on_mismatch():
+    warnings = []
+    clean = _clean_invoice_header(
+        {"supplier_tax_id": "27AAACG8030H2ZR", "state_code": "29"}, warnings, "export",
+    )
+    assert clean["state_code"] == "27"
+    assert any("used the GSTIN" in w for w in warnings)
+
+
+def test_state_code_filled_from_a_valid_gstin_when_missing():
+    clean = _clean_invoice_header({"supplier_tax_id": "27AAACG8030H2ZR"}, [], "export")
+    assert clean["state_code"] == "27"
+
+
+def test_gstin_with_a_letter_entity_code_is_valid():
+    # 13th character is the registration number within the state: a LETTER
+    # after the first nine. A digits-only pattern rejected these.
+    from validate import _GSTIN_RE
+    assert _GSTIN_RE.match("27AAACG8030HAZR")
+    assert _GSTIN_RE.match("27AAACG8030H2ZR")
+    assert not _GSTIN_RE.match("27AAACG8030H2XR")  # 14th char must be Z
+    assert not _GSTIN_RE.match("0388012345")
+
+
+# ── currency: printed names/symbols are normalized to ISO codes ─────────
+
+def test_euro_is_normalized_to_eur():
+    # Confirmed real case: "EURO" failed the validator's ISO check, which is
+    # retryable, wasting a retry (and on one file the retry blanked it).
+    assert _clean_invoice_header({"currency": "EURO"}, [], "export")["currency"] == "EUR"
+
+
+def test_other_unambiguous_currency_spellings_are_normalized():
+    for raw, iso in [("Euros", "EUR"), ("€", "EUR"), ("US$", "USD"), ("U.S. Dollars", "USD"),
+                     ("Rs.", "INR"), ("Indian Rupees", "INR"), ("£", "GBP"), ("usd", "USD")]:
+        assert _clean_invoice_header({"currency": raw}, [], "export")["currency"] == iso, raw
+
+
+def test_ambiguous_or_unknown_currency_is_left_alone():
+    # "$" and "¥" each belong to several currencies -- not guessed.
+    for raw in ("$", "¥", "DOLLARS", "ZZ-COIN"):
+        assert _clean_invoice_header({"currency": raw}, [], "export")["currency"] == raw, raw
+
+
+def test_missing_currency_stays_blank():
+    assert _clean_invoice_header({"currency": None}, [], "export")["currency"] == ""
+    assert _clean_invoice_header({}, [], "export")["currency"] == ""
+
+
+# ── packing-list repeats and bundle duplicates ──────────────────────────
+
+from validate import _drop_packing_list_duplicates, _drop_duplicates_that_break_total
+
+
+def _gi(desc, qty=475, price=65.0, total=30875.0, part=""):
+    return {"product_description": desc, "quantity": qty, "unit_price": price,
+            "line_total": total, "part_number": part, "item_ser_no": 1}
+
+
+def test_priceless_packing_list_repeat_is_dropped_by_description_without_a_part_number():
+    # Real case (20260829132622): no part-number column; the packing list
+    # repeated the item with no price -> phantom row 2 failed validation.
+    items = [_gi("OMEPRAZOLE GR PELLETS 13.4% M/M"), _gi("OMEPRAZOLE GR PELLETS 13.4% M/M", price="", total="")]
+    warnings = []
+    kept = _drop_packing_list_duplicates(items, warnings)
+    assert len(kept) == 1 and kept[0]["unit_price"] == 65.0
+    assert warnings and "packing-list repeat" in warnings[0]
+
+
+def test_priceless_repeat_tolerates_small_ocr_differences_in_the_description():
+    items = [_gi("ATORVASTATIN CALCIUM TRIHYDRATE USP", qty=26, price=120.0, total=3120.0),
+             _gi("ATORVASTATINCALCIUM TRIHYDRATE USP", qty=26, price="", total="")]
+    assert len(_drop_packing_list_duplicates(items, [])) == 1
+
+
+def test_priceless_row_for_a_different_product_is_kept():
+    items = [_gi("OMEPRAZOLE GR PELLETS"), _gi("PANTOPRAZOLE SODIUM SESQUIHYDRATE", price="", total="")]
+    assert len(_drop_packing_list_duplicates(items, [])) == 2
+
+
+def test_priceless_row_with_a_different_quantity_is_kept():
+    items = [_gi("OMEPRAZOLE GR PELLETS"), _gi("OMEPRAZOLE GR PELLETS", qty=100, price="", total="")]
+    assert len(_drop_packing_list_duplicates(items, [])) == 2
+
+
+def _bundle_items():
+    # Real case (57_202608281144371.pdf, an 18-page bundle): the same
+    # 30 KG x 80.00 = 2,400.00 line from the commercial invoice, the
+    # purchase order and the export invoice.
+    return [
+        _gi("AMLODIPINE BESYLATE PH.EUR", 30, 80.0, 2400.0),
+        _gi("Amiodipine Besilate-Hetero", 30, 80.0, 2400.0),
+        _gi("JAMLODIPIN R93339 BESILATE P1 PH.EUR Batch: AAAL 6", 30.0, 80.0, 2400.0),
+    ]
+
+
+def test_bundle_duplicates_are_dropped_when_that_reconciles_the_printed_total():
+    warnings = []
+    kept = _drop_duplicates_that_break_total(_bundle_items(), {"invoice_total": 2400}, warnings)
+    assert len(kept) == 1 and kept[0]["product_description"] == "AMLODIPINE BESYLATE PH.EUR"
+    assert warnings and "bundled PDF" in warnings[0]
+
+
+def test_genuine_repeated_lines_are_kept_when_they_already_reconcile():
+    # Two batches, same quantity and price: lines sum to the printed total,
+    # so nothing is dropped no matter how similar they look.
+    items = [_gi("OMEPRAZOLE GR PELLETS batch A"), _gi("OMEPRAZOLE GR PELLETS batch B")]
+    assert len(_drop_duplicates_that_break_total(items, {"invoice_total": 61750}, [])) == 2
+
+
+def test_duplicates_are_kept_if_dropping_them_would_not_reconcile_either():
+    # Total matches neither 3 x 2400 nor any smaller subset -> a human
+    # needs to look; don't guess.
+    assert len(_drop_duplicates_that_break_total(_bundle_items(), {"invoice_total": 3000}, [])) == 3
+
+
+def test_no_numeric_total_means_nothing_is_dropped():
+    assert len(_drop_duplicates_that_break_total(_bundle_items(), {"invoice_total": ""}, [])) == 3
+    assert len(_drop_duplicates_that_break_total(_bundle_items(), {"invoice_total": "2400.00 / 2400.00"}, [])) == 3
+
+
+def test_identical_numbers_on_unrelated_products_are_never_treated_as_duplicates():
+    items = [_gi("OMEPRAZOLE GR PELLETS", 30, 80.0, 2400.0), _gi("ZZZZ QQQQ XXXX", 30, 80.0, 2400.0)]
+    assert len(_drop_duplicates_that_break_total(items, {"invoice_total": 2400}, [])) == 2
+
+
+def test_validate_and_coerce_applies_the_bundle_dedupe_end_to_end():
+    schema = load_template_schema(_TEMPLATES / "EXP_TEMPLET.xlsx")
+    raw = {
+        "invoice_header": {"invoice_number": "SI3626102057", "invoice_total": 2400},
+        "line_items": [
+            {"item_ser_no": 1, "product_description": "AMLODIPINE BESYLATE PH.EUR", "quantity": 30, "unit_price": 80.0, "line_total": 2400.0},
+            {"item_ser_no": 2, "product_description": "Amiodipine Besilate-Hetero", "quantity": 30, "unit_price": 80.0, "line_total": 2400.0},
+            {"item_ser_no": 3, "product_description": "AMLODIPINE BESILATE PH EUR", "quantity": 30, "unit_price": 80.0, "line_total": 2400.0},
+        ],
+    }
+    sheets, warnings, _ = validate_and_coerce(raw, schema, "export")
+    assert len(sheets["ITEM"]) == 1
+    assert [row["Item_Ser_No"] for row in sheets["ITEM"]] == [1]
+
+
+def test_bundle_duplicate_with_a_long_description_is_still_recognised():
+    # The REAL third description of the 18-page bundle: the same item with
+    # batch / dates / packing detail appended. Whole-string similarity to
+    # the short one is only ~0.3; word overlap is what recognises it.
+    items = _bundle_items()
+    items[2]["product_description"] = (
+        "JAMLODIPIN R93339 BESILATE P1 PH.EUR Batch: AAAL 6070071 Mfg.Date: 62026 "
+        "Expiry/Retest Date: 62031 Packing Details: 1X30.00 KGS"
+    )
+    kept = _drop_duplicates_that_break_total(items, {"invoice_total": 2400}, [])
+    assert len(kept) == 1
+
+
+def test_word_overlap_does_not_match_unrelated_products():
+    from validate import _desc_similarity
+    assert _desc_similarity("OMEPRAZOLE GR PELLETS 13.4% M/M", "PANTOPRAZOLE SODIUM SESQUIHYDRATE") < 0.6
+    assert _desc_similarity("BOLT", "NUT WASHER ASSEMBLY KIT") < 0.6
+
+
+def test_bundle_duplicates_with_different_extra_text_are_recognised_by_shared_words():
+    # The REAL second run of the 18-page bundle: each document appends
+    # different text to the same drug name, so fractional overlap is low but
+    # the two long drug-name words are shared.
+    items = [
+        _gi("AMLODIPINE BESYLATE PH.EUR [1X30 KGS]", 30.0, 80.0, 2400.0),
+        _gi("Amiodipine Besilate-Hetero Mfg Part No:11101355-HETERO", 30, 80.0, 2400.0),
+        _gi("JAMLODIPIN R93339 BESILATE", 30.0, 80.0, 2400.0),
+    ]
+    warnings = []
+    kept = _drop_duplicates_that_break_total(items, {"invoice_total": 2400}, warnings)
+    assert len(kept) == 1 and kept[0]["product_description"].startswith("AMLODIPINE")
+    assert warnings and "rows 2, 3" in warnings[0]
+
+
+def test_shared_words_alone_never_drop_anything_that_already_reconciles():
+    items = [_gi("AMLODIPINE BESYLATE batch A", 30, 80.0, 2400.0), _gi("AMLODIPINE BESYLATE batch B", 30, 80.0, 2400.0)]
+    assert len(_drop_duplicates_that_break_total(items, {"invoice_total": 4800}, [])) == 2
+
+
+def test_shared_long_words_ignores_short_and_unrelated_words():
+    from validate import _shared_long_words
+    assert _shared_long_words("PH EUR KGS", "PH EUR KGS") == 0           # all words under 5 chars
+    assert _shared_long_words("OMEPRAZOLE GR PELLETS", "PANTOPRAZOLE SODIUM SESQUIHYDRATE") == 0
+    assert _shared_long_words("AMLODIPINE BESYLATE PH.EUR", "Amiodipine Besilate-Hetero") == 2
+
+
+# ── a row with no quantity, price or amount is a stray fragment ─────────
+
+def test_a_row_with_no_numbers_at_all_is_discarded_with_a_warning():
+    warnings = []
+    assert _clean_generic_item({"product_description": "STRAY FRAGMENT", "hsn_code": ""}, warnings, 4, 5) is None
+    assert warnings and "discarded a row with no quantity, unit price or amount" in warnings[0]
+
+
+def test_a_row_with_any_one_number_is_kept():
+    # Even a lone quantity is a real (if incomplete) row: let the validator
+    # report what's missing instead of silently dropping it.
+    for field, value in [("quantity", 5), ("unit_price", 2.5), ("line_total", 12.5)]:
+        item = _clean_generic_item({"product_description": "WIDGET", field: value}, [], 0, 1)
+        assert item is not None, field

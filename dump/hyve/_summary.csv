@@ -1,0 +1,6 @@
+﻿file,status,shipment_type,method,ocr_time_sec,time_sec,item_rows,total_tokens,cost_inr,warnings,extraction_status,attempts,validation_errors
+SYT-31036644.pdf,ok,export,2d_layout_canvas,0.0,81.6,2,28641,0.2845,0,validation_failed,3,1
+SYT-31036653.pdf,ok,export,2d_layout_canvas,0.0,106.0,2,37248,0.4176,0,validation_failed,3,1
+SYT-31036656.pdf,ok,export,2d_layout_canvas,0.0,85.5,2,34839,0.3309,0,validation_failed,3,2
+SYT-31036661.pdf,ok,export,2d_layout_canvas,0.0,95.5,2,20318,0.3703,0,validated,1,0
+SYT-31036662.pdf,ok,export,2d_layout_canvas,0.0,79.8,1,19124,0.3176,0,validated,1,0

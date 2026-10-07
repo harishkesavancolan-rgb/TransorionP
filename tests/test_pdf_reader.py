@@ -162,3 +162,60 @@ def test_maybe_recover_garbled_ocr_keeps_original_when_recovery_no_better():
     assert text == _SHREDDED_SAMPLE
     assert method == "ocrmypdf_docker"
     assert ocr_time == 17.0  # recovery time is still spent/counted even when not adopted
+
+
+# ── a failing scan check must be visible, never silent ──────────────────
+
+def test_check_scan_quality_warns_when_the_check_itself_fails(monkeypatch, caplog):
+    # Confirmed real failure mode: an OpenCV upgrade made scan_validator
+    # raise, check_scan_quality swallowed it at debug level and returned
+    # None (which callers read as "fine"), and tilt correction plus the
+    # clipped-table check were silently off across 100+ extractions.
+    import logging
+    import pdf_reader
+
+    def boom(*a, **k):
+        raise TypeError("simulated OpenCV incompatibility")
+
+    monkeypatch.setattr(pdf_reader.scan_validator, "validate_pdf", boom)
+    with caplog.at_level(logging.WARNING, logger="invoice_extractor"):
+        assert pdf_reader.check_scan_quality("whatever.pdf") is None
+    assert any("clipped-table check SKIPPED" in r.getMessage() for r in caplog.records)
+
+
+def test_detect_page_skew_warns_when_it_fails(monkeypatch, caplog):
+    import logging
+    import pdf_reader
+
+    def boom(*a, **k):
+        raise TypeError("simulated OpenCV incompatibility")
+
+    monkeypatch.setattr(pdf_reader.scan_validator, "validate_pdf", boom)
+    with caplog.at_level(logging.WARNING, logger="invoice_extractor"):
+        assert pdf_reader._detect_page_skew("whatever.pdf", 0) is None
+    assert any("tilt NOT corrected" in r.getMessage() for r in caplog.records)
+
+
+def _glyph(text, x0, x1, top=368.26, height=4.44):
+    return {"text": text, "top": top, "bottom": top + height, "x0": x0, "x1": x1}
+
+
+def test_pad_space_overlapping_the_first_digit_does_not_split_the_number():
+    # Real HYVE invoice: a right-aligned "23,150.31" was padded with space
+    # glyphs and the last space (549.24-550.07) sat INSIDE the first digit
+    # "2" (548.64-550.89). Sorted by x0 it landed between "2" and "3", so
+    # the number came out as "2 3,150.31"; the model dropped the lone "2"
+    # and extracted 3,150.31.
+    digits = [("2", 548.64, 550.89), ("3", 550.92, 553.17), (",", 553.2, 554.35), ("1", 554.39, 556.64),
+              ("5", 556.67, 558.92), ("0", 558.95, 561.2), (".", 561.22, 562.38), ("3", 562.42, 564.67),
+              ("1", 564.7, 566.95)]
+    pads = [(" ", 540.75 + i * 0.84, 541.58 + i * 0.84) for i in range(11)]
+    chars = [_glyph(t, a, b) for t, a, b in digits + pads]
+    kept = _dedupe_overlapping_chars(chars)
+    assert "".join(c["text"] for c in sorted(kept, key=lambda c: c["x0"])).strip() == "23,150.31"
+
+
+def test_real_gap_between_words_is_kept():
+    chars = [_glyph("A", 10.0, 12.0), _glyph(" ", 12.0, 13.0), _glyph("B", 13.2, 15.0)]
+    kept = _dedupe_overlapping_chars(chars)
+    assert "".join(c["text"] for c in sorted(kept, key=lambda c: c["x0"])) == "A B"

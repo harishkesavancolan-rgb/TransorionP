@@ -1,0 +1,11 @@
+﻿file,status,shipment_type,method,ocr_time_sec,time_sec,item_rows,total_tokens,cost_inr,warnings,extraction_status,attempts,validation_errors
+203620644.pdf,ok,export,2d_layout_canvas,0.0,206.9,1,43184,0.763,0,validated,2,0
+909238508.pdf,ok,export,2d_layout_canvas,0.0,89.2,1,25916,0.2958,2,validation_failed,3,1
+TAX INV 2018007750.pdf,ok,export,2d_layout_canvas,0.0,108.1,1,24876,0.37,0,validated,1,0
+Xerox Scan_14082026171307G.pdf,ok,export,2d_layout_canvas,0.0,171.8,10,153952,0.8471,2,validation_failed,3,7
+Xerox Scan_17082026154002.pdf,ok,export,2d_layout_canvas,0.0,87.0,2,39454,0.3876,0,validation_failed,1,1
+Xerox Scan_18082026163701.pdf,ok,export,2d_layout_canvas,0.0,71.5,2,37776,0.3233,2,validation_failed,1,1
+Xerox Scan_20082026163502.pdf,ok,export,2d_layout_canvas,0.0,110.9,2,128250,0.678,2,validation_failed,2,1
+Xerox Scan_22082026151941.pdf,ok,export,2d_layout_canvas,0.0,126.4,2,134354,0.7268,1,validation_failed,3,1
+Xerox Scan_24082026151508.pdf,ok,export,2d_layout_canvas,0.0,149.6,22,317017,1.2353,1,validation_failed,3,9
+Xerox Scan_24082026154344G.pdf,ok,export,2d_layout_canvas,0.0,68.8,2,28542,0.3368,1,validation_failed,1,1

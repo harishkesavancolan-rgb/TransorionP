@@ -399,6 +399,41 @@ def test_not_checked_returned_when_inputs_missing_not_error():
     assert c.status == "NOT_CHECKED"
 
 
+# ── Free-of-cost lines and missing line amounts ─────────────────────────
+
+def test_zero_line_amount_with_real_price_is_a_non_retryable_warning():
+    items = [{"Item_Qty": 5, "Item_Unit_Price": 10.0, "ItmTaxableVal": 0}]
+    c = _find(validate_line_items(items, "export"), "QTY_X_UNIT_PRICE", item=1)
+    assert c.status == "WARNING"
+    assert c.retryable is False
+    assert "free-of-cost" in c.message
+
+
+def test_free_of_cost_line_does_not_fail_validation_end_to_end():
+    result = _export_result()
+    foc = dict(result["sheets"]["ITEM"][0], Item_Ser_No=2, ItmTaxableVal=0)
+    result["sheets"]["ITEM"].append(foc)
+    validation = validate_invoice(result, invoice_text="", shipment_type="export")
+    assert not any(c.rule == "QTY_X_UNIT_PRICE" and c.status == "ERROR" for c in validation.checks)
+
+
+def test_header_total_not_checked_against_a_partial_line_sum():
+    # One of two lines has no amount: summing only the other would report
+    # a guaranteed, misleading mismatch.
+    header = {"invoice_total": 78382.08}
+    items = [{"ItmTaxableVal": 51166.08}, {"ItmTaxableVal": None}]
+    c = _find(validate_totals(header, items, "export"), "HEADER_LINE_TOTAL")
+    assert c.status == "NOT_CHECKED"
+    assert "1 of 2" in c.message
+
+
+def test_header_total_includes_zero_value_lines_in_the_sum():
+    header = {"invoice_total": 51166.08}
+    items = [{"ItmTaxableVal": 51166.08}, {"ItmTaxableVal": 0}]
+    c = _find(validate_totals(header, items, "export"), "HEADER_LINE_TOTAL")
+    assert c.status == "PASS"
+
+
 # ── MULTI_INVOICE_TOTAL_SPLIT: combined-document total must mirror ──────
 # invoice_number's own split, never be a single computed/summed figure.
 
@@ -539,3 +574,211 @@ def test_import_foreign_vat_in_supplier_tax_id_field_is_not_checked():
     checks = validate_format_and_types(header, [], "import")
     c = next(c for c in checks if c.rule == "FORMAT_TYPE" and c.field == "supplier_tax_id")
     assert c.status == "NOT_CHECKED"
+
+
+# ── ORDER_NUMBER_SOURCE_MATCH with several POs in one document ──────────
+
+def test_each_items_po_is_matched_against_every_po_in_the_document():
+    # Two POs printed on the invoice, one per item. The old check compared
+    # both items to only the FIRST "Order No:" found and flagged item 2.
+    text = "Order No: PO-111 ... later section ... Order No: PO-222"
+    items = [
+        {"Item_Desc": "A", "order_number": "PO-111"},
+        {"Item_Desc": "B", "order_number": "PO-222"},
+    ]
+    checks = [c for c in validate_source_consistency(items, "export", text)
+              if c.rule == "ORDER_NUMBER_SOURCE_MATCH"]
+    assert [(c.item, c.status) for c in checks] == [(1, "PASS"), (2, "PASS")]
+
+
+def test_a_po_that_matches_none_of_the_documents_pos_is_still_an_error():
+    text = "Order No: PO-111 ... Order No: PO-222"
+    items = [{"Item_Desc": "A", "order_number": "PO-999"}]
+    c = next(c for c in validate_source_consistency(items, "export", text)
+             if c.rule == "ORDER_NUMBER_SOURCE_MATCH")
+    assert c.status == "ERROR" and c.retryable is True
+    assert "PO-111" in c.message and "PO-222" in c.message
+
+
+def test_order_number_with_dates_still_matches_by_containment():
+    text = "P/O: 446297.1 and P/O: 450044.2"
+    items = [{"Item_Desc": "A", "order_number": "446297.1 (20-APR-26) / 450044.2 (15-JUN-26)"}]
+    c = next(c for c in validate_source_consistency(items, "export", text)
+             if c.rule == "ORDER_NUMBER_SOURCE_MATCH")
+    assert c.status == "PASS"
+
+
+def test_order_check_is_not_checked_when_the_document_has_no_po_label():
+    items = [{"Item_Desc": "A", "order_number": "PO-111"}]
+    c = next(c for c in validate_source_consistency(items, "export", "no labels here")
+             if c.rule == "ORDER_NUMBER_SOURCE_MATCH")
+    assert c.status == "NOT_CHECKED"
+
+
+# ── HEADER_LINE_TOTAL: discount / freight lines printed on the invoice ──
+# Confirmed real case: 10 of 10 invoices from one exporter failed this
+# check solely because they print "TOTAL / LESS TRADE DISCOUNT / ADD AIR
+# FREIGHT / G-Total" -- every extracted total was correct.
+
+# Layout text of the real 6168-CFWD invoice's totals block (abridged).
+_ADJUSTED_TOTALS_TEXT = """\
+HSN CODE │ ORDER #     │ ART #
+64061020 │2606 - 407 │Fire Fighter GTX III U│Black │Boot Uppers  │ Cow         │         10   │   77.60      │      776.00
+64061020 │2607 - 405 │ Oslo GTX 3.0 Carbon U│Black │Shoe Uppers  │ Cow         │         400   │  33.06     │     13224.00
+                                      TOTAL:-                               │                               14000.00
+                                      LESS  TRADE  DISCOUNT   0.25% IN EURO:-                 │                 35.00
+                                      TOTAL:-                               │                               13965.00
+                                      ADD  AIR FREIGHT   50% IN EURO:-                    │                    531.28
+FOREIGN  AGENT   COMM   8% IN EURO:1120.00
+Amount Chargeable                        │       G-Total    │   14,496.28
+"""
+
+
+def _totals_check(header, items, text):
+    return _find(validate_totals(header, items, "export", invoice_text=text), "HEADER_LINE_TOTAL")
+
+
+def test_total_reconciles_through_printed_discount_and_freight():
+    items = [{"ItmTaxableVal": 776.0}, {"ItmTaxableVal": 13224.0}]
+    c = _totals_check({"invoice_total": 14496.28}, items, _ADJUSTED_TOTALS_TEXT)
+    assert c.status == "PASS"
+    assert "TRADE DISCOUNT" in c.message and "FREIGHT" in c.message
+    assert c.difference == 0
+
+
+def test_discount_only_invoice_reconciles():
+    # 58,525.71 less a 0.25% discount of 146.31 -> 58,379.40, no freight.
+    text = "TOTAL:-   │   58525.71\nLESS  TRADE  DISCOUNT   0.25% IN EURO:-   │   146.31\n"
+    c = _totals_check({"invoice_total": 58379.40}, [{"ItmTaxableVal": 58525.71}], text)
+    assert c.status == "PASS"
+
+
+def test_commission_line_is_never_added_to_the_total():
+    # "FOREIGN AGENT COMM ... 1120.00" is informational, not part of the
+    # total: the reconciling subset is discount + freight only.
+    items = [{"ItmTaxableVal": 14000.0}]
+    c = _totals_check({"invoice_total": 14496.28}, items, _ADJUSTED_TOTALS_TEXT)
+    assert c.status == "PASS" and "COMM" not in c.message
+
+
+def test_mismatch_the_printed_adjustments_cannot_explain_is_still_an_error():
+    # Discount/freight lines exist, but the extracted total is off by more
+    # than they account for -> a real problem, must NOT be waved through.
+    items = [{"ItmTaxableVal": 14000.0}]
+    # printed total LARGER than the lines can account for -> flagged as an
+    # incomplete item list (still an ERROR, so it can't pass as valid)
+    checks = validate_totals({"invoice_total": 15000.00}, items, "export", invoice_text=_ADJUSTED_TOTALS_TEXT)
+    c = _find(checks, "LINE_ITEMS_INCOMPLETE")
+    assert c.status == "ERROR" and _find(checks, "HEADER_LINE_TOTAL") is None
+
+
+def test_adjustment_lines_without_amounts_do_not_explain_a_mismatch():
+    # The real 6167 case: "LESS TRADE DISCOUNT 0.25%" is printed but its
+    # amount isn't in the text. The percentage must not be mistaken for an
+    # amount, so nothing reconciles and the mismatch stays flagged.
+    text = "TOTAL:-\nLESS TRADE   DISCOUNT   0.25% IN EURO:-\nADD  AIR FREIGHT   50% IN EURO:-\n"
+    checks = validate_totals({"invoice_total": 45386.09}, [{"ItmTaxableVal": 44698.0}], "export", invoice_text=text)
+    assert _find(checks, "LINE_ITEMS_INCOMPLETE").status == "ERROR"
+
+
+def test_mismatch_with_no_adjustment_lines_at_all_is_still_an_error():
+    # The Piramal case: a genuinely wrong printed total, nothing in the
+    # text that could explain it.
+    items = [{"ItmTaxableVal": 51166.08}, {"ItmTaxableVal": 27216.00}]
+    c = _totals_check({"invoice_total": 51166.08}, items, "Grand Total 51,166.08\n")
+    assert c.status == "ERROR"
+
+
+def test_without_source_text_behaviour_is_unchanged():
+    items = [{"ItmTaxableVal": 14000.0}]
+    c = _find(validate_totals({"invoice_total": 14496.28}, items, "export"), "LINE_ITEMS_INCOMPLETE")
+    assert c.status == "ERROR"
+
+
+def test_exact_match_never_needs_the_adjustment_lines():
+    text = "LESS DISCOUNT 35.00\nADD FREIGHT 531.28\n"
+    c = _totals_check({"invoice_total": 14000.0}, [{"ItmTaxableVal": 14000.0}], text)
+    assert c.status == "PASS" and c.message == ""
+
+
+def test_adjusted_total_passes_validation_end_to_end():
+    result = _export_result(header_overrides={"invoice_total": 14496.28})
+    item = result["sheets"]["ITEM"][0]
+    item.update(Item_Qty=1, Item_Unit_Price=14000.0, ItmTaxableVal=14000.0)
+    validation = validate_invoice(result, invoice_text=_ADJUSTED_TOTALS_TEXT, shipment_type="export")
+    c = _find(validation.checks, "HEADER_LINE_TOTAL")
+    assert c.status == "PASS"
+
+
+# ── LINE_ITEMS_INCOMPLETE vs HEADER_LINE_TOTAL ──────────────────────────
+# Confirmed real case: 4 JCB invoices whose source rows summed exactly to
+# the printed total, but the model had extracted only the first page's rows.
+
+def test_lines_short_of_the_printed_total_are_reported_as_incomplete_and_retryable():
+    result = _export_result(header_overrides={"invoice_total": 10289.76})
+    item = result["sheets"]["ITEM"][0]
+    item.update(Item_Qty=1, Item_Unit_Price=5992.54, ItmTaxableVal=5992.54)
+    validation = validate_invoice(result, invoice_text="", shipment_type="export")
+    c = _find(validation.checks, "LINE_ITEMS_INCOMPLETE")
+    assert c.status == "ERROR" and c in validation.retryable_errors
+    assert "4297.22" in c.message and "EVERY page" in c.message
+    assert _find(validation.checks, "HEADER_LINE_TOTAL") is None
+
+
+def test_lines_over_the_printed_total_stay_a_non_retryable_header_mismatch():
+    # The Piramal case: lines add up to MORE than the printed total. A retry
+    # can only push the model toward the sum, so it must never be retryable.
+    items = [{"ItmTaxableVal": 51166.08}, {"ItmTaxableVal": 27216.00}]
+    checks = validate_totals({"invoice_total": 51166.08}, items, "export")
+    assert _find(checks, "HEADER_LINE_TOTAL").status == "ERROR"
+    assert _find(checks, "LINE_ITEMS_INCOMPLETE") is None
+    result = _export_result(header_overrides={"invoice_total": 51166.08})
+    result["sheets"]["ITEM"].append(dict(result["sheets"]["ITEM"][0], Item_Ser_No=2, ItmTaxableVal=27216.0, Item_Unit_Price=5.25, Item_Qty=5184))
+    validation = validate_invoice(result, invoice_text="", shipment_type="export")
+    assert not any(c.rule == "HEADER_LINE_TOTAL" for c in validation.retryable_errors)
+
+
+def test_incomplete_item_list_feedback_goes_to_the_items_pass_only():
+    result = _export_result(header_overrides={"invoice_total": 60000.00})  # fixture's one line is 51,166.08
+    validation = validate_invoice(result, invoice_text="", shipment_type="export")
+    header_fb, items_fb = build_retry_feedback(validation)
+    assert header_fb is None and items_fb is not None and "LINE_ITEMS_INCOMPLETE" in items_fb
+
+
+# ── HSN_FORMAT: Item No must not end up in the HSN column ───────────────
+
+def _hsn_checks(value):
+    items = [{"Item_RITC": value}]
+    return [c for c in validate_format_and_types({}, items, "export") if c.rule == "HSN_FORMAT"]
+
+
+def test_item_numbers_are_not_valid_hsn_codes():
+    for bad in ("160", "10", "120", 250):  # the real values seen on the JCB invoices
+        (c,) = _hsn_checks(bad)
+        assert c.status == "ERROR" and c.retryable is True, bad
+        assert "item or line number" in c.message
+
+
+def test_real_hsn_codes_pass_in_any_printed_style():
+    for ok in ("8481 80 90", "84314980", "8431.49.90", "4016 93 40", "8431", "843149"):
+        assert _hsn_checks(ok)[0].status == "PASS", ok
+
+
+def test_blank_hsn_is_never_checked():
+    assert _hsn_checks("") == [] and _hsn_checks(None) == []
+
+
+def test_unusual_length_hsn_is_only_a_warning():
+    for odd in ("8431499012", "84314"):
+        (c,) = _hsn_checks(odd)
+        assert c.status == "WARNING" and not c.retryable, odd
+
+
+def test_a_line_number_in_the_hsn_column_fails_validation_end_to_end():
+    result = _export_result()
+    result["sheets"]["ITEM"][0]["Item_RITC"] = "160"
+    validation = validate_invoice(result, invoice_text="", shipment_type="export")
+    assert not validation.valid
+    assert any(c.rule == "HSN_FORMAT" for c in validation.retryable_errors)
+    _, items_fb = build_retry_feedback(validation)
+    assert items_fb and "HSN Code" in items_fb

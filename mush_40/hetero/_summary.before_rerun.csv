@@ -1,0 +1,11 @@
+﻿file,status,shipment_type,method,ocr_time_sec,time_sec,item_rows,total_tokens,cost_inr,warnings,extraction_status,attempts,validation_errors
+159_20260829123735.pdf,ok,export,ocrmypdf_docker,14.84,216.5,1,21912,0.283,1,validated,2,0
+20260828121242.pdf,ok,export,ocrmypdf_docker,15.13,181.2,1,17623,0.3023,1,validated,1,0
+20260829132622.pdf,ok,export,ocrmypdf_docker,16.59,142.2,2,35466,0.2989,2,validation_failed,3,2
+20260829132637.pdf,ok,export,ocrmypdf_docker,14.64,180.0,1,18262,0.3025,1,validation_failed,1,1
+20260829135349.pdf,ok,export,ocrmypdf_docker,14.28,263.3,1,32912,0.6374,1,validation_failed,2,1
+51_20260828114404.pdf,ok,export,ocrmypdf_docker,14.93,104.7,1,16944,0.2637,1,validated,1,0
+56_20260828114514.pdf,ok,export,ocrmypdf_docker,14.34,131.6,1,18086,0.3037,1,validated,1,0
+57_20260828114437.pdf,ok,export,ocrmypdf_docker,14.46,115.8,1,18498,0.3177,1,validated,1,0
+57_202608281144371.pdf,ok,export,ocrmypdf_docker,20.35,119.2,3,99340,0.4447,2,validation_failed,2,1
+SI3726201912-inv.pdf,ok,export,2d_layout_canvas,0.0,70.5,1,14460,0.2218,0,validated,1,0

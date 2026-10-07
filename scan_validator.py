@@ -48,7 +48,11 @@ def _find_line_segments(bw, min_len_frac=0.25):
     )
     if lines is None:
         return []
-    return [tuple(l[0]) for l in lines]
+    # OpenCV 4.x returns shape (N, 1, 4); 5.x returns (N, 4). Indexing
+    # l[0] on the 5.x shape yields a scalar and raised TypeError -- which
+    # pdf_reader's callers swallow, silently disabling deskew and the
+    # clipped-table check. reshape handles both.
+    return [tuple(int(v) for v in l) for l in np.asarray(lines).reshape(-1, 4)]
 
 
 def _angle_of(x1, y1, x2, y2):
